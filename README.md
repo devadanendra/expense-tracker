@@ -1,7 +1,37 @@
 # Expense Tracker
 
-Offline-first Rupiah expense tracker PWA.
+Single-user, offline-first Rupiah expense tracker. A plain HTML/JS PWA: no build step, no dependencies.
 
-Run tests: `npm test`
+## Run locally
 
-Release: bump `CACHE` in `sw.js` (`et-v1` → `et-v2` …) on every deploy, or installed phones keep the old files.
+```
+python3 -m http.server 8080
+```
+
+Open http://localhost:8080.
+
+## Tests
+
+```
+npm test
+```
+
+## Deploy to GitHub Pages
+
+Repository **Settings › Pages › Build and deployment › Deploy from a branch**, branch `main`, folder `/ (root)`.
+
+## Install on your phone
+
+Open the Pages URL in Chrome, then **⋮ › Add to Home screen** (or **Install app**).
+
+## Release
+
+Bump `CACHE` in `sw.js` (`et-v1` → `et-v2` …) on every deploy, or installed phones keep the old files.
+
+## Google Sheet backup
+
+Optional one-way backup to your own Google Sheet: follow [apps-script/SETUP.md](apps-script/SETUP.md).
+
+## Your data
+
+The phone is the main copy. The Sheet is a read-only backup the app pushes to; it is read back only when you restore on a new phone. As a last resort, **Settings › Export CSV** saves everything as a file you can keep.
