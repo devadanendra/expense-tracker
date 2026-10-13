@@ -5,6 +5,8 @@ const COLUMNS = ['date', 'time', 'amount', 'category', 'note', 'id'];
 const NOT_OURS = 'Not an Expense Tracker CSV';
 
 const sortKey = (e) => `${e.date} ${e.time}`;
+// A leading = + - @ (or tab/CR) would run as a formula in Excel/Sheets: prefix ' to keep it text.
+const defuse = (s) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
 const quote = (s) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
 export function toCSV(expenses, categories) {
@@ -12,7 +14,7 @@ export function toCSV(expenses, categories) {
   const rows = expenses
     .filter((e) => !e.deleted)
     .sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0))
-    .map((e) => [e.date, e.time, e.amount, names.get(e.categoryId) ?? 'Other', e.note, e.id].map((v) => quote(String(v))).join(','));
+    .map((e) => [e.date, e.time, e.amount, names.get(e.categoryId) ?? 'Other', e.note, e.id].map((v) => quote(defuse(String(v)))).join(','));
   return [COLUMNS.join(','), ...rows].join('\r\n');
 }
 

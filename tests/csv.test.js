@@ -222,3 +222,10 @@ test('unterminated quote rejects the file instead of eating rows', () => {
   assert.deepEqual(r.expenses, []);
   assert.deepEqual(r.errors, ['Malformed CSV: unterminated quote']);
 });
+
+test('toCSV defuses formula-leading fields', () => {
+  const e = { id: 'a', date: '2026-01-01', time: '10:00', amount: 5, categoryId: 'x', note: '=HYPERLINK("x")', deleted: false };
+  const out = toCSV([e], [{ id: 'x', name: '@evil' }]);
+  assert.ok(out.includes(`"'=HYPERLINK(""x"")"`));
+  assert.ok(out.includes(",'@evil,"));
+});

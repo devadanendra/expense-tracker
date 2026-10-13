@@ -36,6 +36,9 @@ export function dayLabel(iso, todayISO, withYear = false) {
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+// A synced category color goes into style=""; anything but a hex color could smuggle extra CSS (url() beacons).
+export const safeColor = (c) => (/^#[0-9a-f]{3,8}$/i.test(c) ? c : '#8a8178');
+
 // --- pieces ---
 
 function compareLine(expenses, ym, today) {
@@ -76,7 +79,7 @@ export const catOf = (cats, id) => cats.get(id) ?? FALLBACK_CAT;
 function row(e, cats) {
   const c = catOf(cats, e.categoryId);
   return `<button class="row" type="button" data-id="${esc(e.id)}">
-    <span class="chip" style="background:${esc(c.color)}">${icon(c.icon)}</span>
+    <span class="chip" style="background:${safeColor(c.color)}">${icon(c.icon)}</span>
     <span class="mid"><span class="t1">${esc(e.note || c.name)}</span><span class="t2">${esc(c.name)} · ${esc(e.time)}</span></span>
     <span class="amt num">${formatNum(e.amount)}</span>
   </button>`;

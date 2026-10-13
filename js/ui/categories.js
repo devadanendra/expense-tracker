@@ -1,7 +1,7 @@
 import * as store from '../store.js';
 import { CATEGORY_COLORS, DEFAULT_CATEGORIES, OTHER_ID } from '../categories.js';
 import { icon } from '../icons.js';
-import { esc } from './home.js';
+import { esc, safeColor } from './home.js';
 
 const ICONS = DEFAULT_CATEGORIES.map((c) => c.icon);
 
@@ -100,7 +100,7 @@ export async function renderCategories(root) {
   <section class="cats">
     <div class="lst">${cats.map((c, i) => `<div class="cat">
       <button class="row" type="button" data-edit="${i}">
-        <span class="chip" style="background:${esc(c.color)}">${icon(c.icon)}</span>
+        <span class="chip" style="background:${safeColor(c.color)}">${icon(c.icon)}</span>
         <span class="t1">${esc(c.name)}</span>
       </button>
       <button class="mv" id="up-${esc(c.id)}" type="button" data-move="${i}" data-to="${i - 1}" aria-label="Move ${esc(c.name)} up"${i ? '' : ' disabled'}>${icon('chevron-up')}</button>
