@@ -263,6 +263,35 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 .ce .btn { width: 100%; margin-top: 18px; }
 .ce .btn:disabled { opacity: .35; cursor: default; }
 
+/* ---------- Settings ---------- */
+.set { padding: 0 14px 32px; }
+.sg { padding: 16px 4px 6px; font-size: 12px; font-weight: 600; color: var(--mu); }
+.set .sr { width: 100%; padding: 6px 0; text-align: left; }
+.set :is(a, button).sr:active { opacity: .6; }
+.set .sr:focus-visible { outline-offset: -2px; border-radius: 12px; }
+.set .t2 { white-space: normal; }
+.ico { width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; background: var(--bg2); display: flex; align-items: center; justify-content: center; }
+.ico svg { width: 15px; height: 15px; }
+.set .v { flex-shrink: 0; display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mu); }
+.set .v svg { width: 16px; height: 16px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+
+/* Settings sheets (passphrase, export, import) reuse the category editor dialog. */
+.ce-txt { margin: 6px 4px 12px; font-size: 13px; line-height: 1.5; color: var(--mu); }
+.ce-txt.ask { font-size: 15px; color: var(--tx); }
+.ce .btns .btn { margin-top: 0; }
+textarea.note { height: auto; padding: 10px 14px; resize: vertical; font-size: 12px; }
+.imp-err { max-height: 30vh; overflow-y: auto; margin: 10px 0 0; padding-left: 20px; text-align: left; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
+  width: max-content; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 14px;
+  background: var(--tx); color: var(--surf); box-shadow: var(--sh2);
+  font-size: 13px; font-weight: 600; text-align: center; pointer-events: none;
+}
+.toast:empty { opacity: 0; }
+dialog .toast { top: 16px; bottom: auto; } /* above a bottom sheet, not over its buttons */
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

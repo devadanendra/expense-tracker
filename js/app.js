@@ -1,10 +1,12 @@
 import * as store from './store.js';
-import { icon } from './icons.js';
+import { SHEET_URL } from './config.js';
+import { createSync } from './sync.js';
 import { renderHome, localISO } from './ui/home.js';
 import { openEntrySheet } from './ui/entry-sheet.js';
 import { renderReports } from './ui/reports.js';
 import { renderSearch } from './ui/search.js';
 import { renderCategories } from './ui/categories.js';
+import { renderSettings, openPassphrase } from './ui/settings.js';
 
 // Shared UI state. ym is the selected month ('YYYY-MM'), set in boot(); report is the reports
 // segment ('categories' | 'weeks'); query is the search text.
@@ -14,18 +16,43 @@ export const state = { ym: '', restoreDismissed: false, report: 'categories', qu
 export function openEntry(expense) {
   openEntrySheet({ expense }).catch((e) => console.error(e));
 }
-// Hook Task 10 fills in: the restore flow.
-export function startRestore() {}
+// fetch is wrapped: an unbound window.fetch throws "Illegal invocation".
+export const sync = createSync({ url: SHEET_URL, fetch: (...a) => fetch(...a), store });
 
-const placeholder = (title) => (root) => {
-  root.innerHTML = `<header class="bar"><a class="ib" href="#/" aria-label="Back">${icon('back')}</a><h1>${title}</h1></header>`;
-};
+// Home restore card: passphrase, "Your Sheet has N expenses. Restore them?", then link.
+export function startRestore() {
+  openPassphrase('restore');
+}
+
+// Push queued changes, only once linked (an unlinked device never pushes: link pull-merges first).
+// A failed push mutes store-change triggers (its own meta write is one) and retries in 60 s, so
+// offline never loops; going online or back to the app lifts the mute.
+let pushTimer = 0;
+let mutedUntil = 0;
+async function autoPush() {
+  clearTimeout(pushTimer);
+  if (!SHEET_URL || !(await store.getMeta()).linked || !(await store.getOutbox()).length) return;
+  const r = await sync.push();
+  if (r.ok) return;
+  mutedUntil = Date.now() + 60000;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushNow, 60000);
+}
+function pushNow() {
+  mutedUntil = 0;
+  autoPush().catch((e) => console.error(e));
+}
+function pushSoon() {
+  if (Date.now() < mutedUntil) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushNow, 2000);
+}
 
 const ROUTES = {
   '#/': renderHome,
   '#/reports': renderReports,
   '#/search': renderSearch,
-  '#/settings': placeholder('Settings'),
+  '#/settings': renderSettings,
   '#/categories': renderCategories,
 };
 const NAV_ROUTES = ['#/', '#/reports'];
@@ -68,6 +95,14 @@ export async function render() {
   shown = route;
 }
 
+// Store changes re-render once a burst of writes settles: a CSV import saves each row, and a
+// full re-render per row made a 1000-row import take ~10 s on desktop (~1 min from home).
+let renderTimer = 0;
+function renderSoon() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 30);
+}
+
 export async function boot() {
   state.ym = localISO().slice(0, 7);
   navigator.storage?.persist?.().catch(() => {});
@@ -82,7 +117,14 @@ export async function boot() {
   document.querySelector('.nav .p').addEventListener('click', () => openEntry());
   addEventListener('hashchange', render);
   // Back from the background on a new day: refresh "Today" labels and the strip.
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
-  store.onChange(render);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    render();
+    pushNow();
+  });
+  addEventListener('online', pushNow);
+  store.onChange(renderSoon);
+  store.onChange(pushSoon);
   await render();
+  pushNow();
 }

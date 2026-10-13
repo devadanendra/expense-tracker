@@ -3,6 +3,7 @@ import { inMonth, total, byDay, dailyStrip, compareToLastMonth } from '../stats.
 import { formatNum, formatRp } from '../money.js';
 import { DEFAULT_CATEGORIES, OTHER_ID } from '../categories.js';
 import { icon } from '../icons.js';
+import { SHEET_URL } from '../config.js';
 import { openEntry, startRestore, render } from '../app.js';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
@@ -152,7 +153,7 @@ export async function renderHome(root, state) {
   const cats = new Map(categories.map((c) => [c.id, c]));
 
   let body;
-  if (storeEmpty && !meta.linked && !state.restoreDismissed) body = restoreCard();
+  if (SHEET_URL && storeEmpty && !meta.linked && !state.restoreDismissed) body = restoreCard();
   else if (!month.length) body = emptyMonth();
   else body = dayGroups(month, cats, (d) => dayLabel(d, today));
 

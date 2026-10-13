@@ -26,6 +26,7 @@ const SHELL = [
   'js/ui/home.js',
   'js/ui/reports.js',
   'js/ui/search.js',
+  'js/ui/settings.js',
 ];
 
 self.addEventListener('install', (e) => {

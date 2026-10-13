@@ -29,6 +29,7 @@ const PATHS = {
   upload: '<path d="M12 20V8M6 13l6-6 6 6M4 4h16"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="8" cy="8" r="1.5"/>',
   inbox: '<path d="M3 13h5l1 3h6l1-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+  shield: '<path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6z"/>',
 };
 
 // Unknown names (e.g. a category icon key from a restored Sheet) fall back to `dots`.
