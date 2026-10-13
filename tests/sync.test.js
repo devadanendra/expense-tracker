@@ -1,0 +1,347 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createSync } from '../js/sync.js';
+
+const URL_ = 'https://script.example/exec';
+const PASS = 'secret-pass';
+
+const exp = (id, updatedAt, extra = {}) => ({
+  id, amount: 1000, categoryId: 'c1', date: '2026-10-01', time: '10:00',
+  note: '', createdAt: 1, updatedAt, deleted: false, ...extra,
+});
+const cat = (id, updatedAt, extra = {}) => ({
+  id, name: id, icon: 'tag', color: '#000000', order: 0, updatedAt, deleted: false, ...extra,
+});
+
+// In-memory store. `edit` mimics the app: write a record and re-mark it in the outbox.
+function fakeStore({ meta = {}, expenses = [], categories = [], outbox = [] } = {}) {
+  const recs = { expense: new Map(), category: new Map() };
+  expenses.forEach((r) => recs.expense.set(r.id, r));
+  categories.forEach((r) => recs.category.set(r.id, r));
+  const box = new Map(outbox.map((e) => [`${e.kind}:${e.id}`, e]));
+  const m = { passphrase: null, linked: false, lastSyncAt: null, lastError: null, ...meta };
+  const s = {
+    meta: m, recs, box, putManyCalls: [],
+    getMeta: async () => ({ ...m }),
+    setMeta: async (patch) => { Object.assign(m, patch); },
+    getOutbox: async () => [...box.values()],
+    clearOutbox: async (entries) => entries.forEach((e) => box.delete(`${e.kind}:${e.id}`)),
+    getRecord: async (kind, id) => recs[kind].get(id),
+    allExpenses: async () => [...recs.expense.values()],
+    allCategories: async () => [...recs.category.values()],
+    putMany: async (kind, list) => {
+      s.putManyCalls.push([kind, list]);
+      list.forEach((r) => recs[kind].set(r.id, r));
+    },
+    markAllDirty: async () => {
+      for (const kind of ['expense', 'category'])
+        for (const id of recs[kind].keys()) box.set(`${kind}:${id}`, { kind, id });
+    },
+    edit(kind, rec) { recs[kind].set(rec.id, rec); box.set(`${kind}:${rec.id}`, { kind, id: rec.id }); },
+  };
+  return s;
+}
+
+const reply = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+
+// handler(body, init) -> body object | response | throws. Records every call.
+function fakeFetch(handler) {
+  const calls = [];
+  const fn = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url, init, body });
+    const out = await handler(body, init);
+    return out && typeof out.json === 'function' ? out : reply(out);
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+const linkedMeta = { passphrase: PASS, linked: true };
+const mk = (store, fetch, url = URL_) => createSync({ url, fetch, store });
+
+test('nourl: push, link and remoteCount make no request', async () => {
+  const fetch = fakeFetch(() => ({ ok: true }));
+  const store = fakeStore({ meta: linkedMeta, outbox: [{ kind: 'expense', id: 'a' }] });
+  const sync = mk(store, fetch, '');
+  assert.deepEqual(await sync.push(), { ok: false, error: 'nourl' });
+  assert.deepEqual(await sync.link(PASS), { ok: false, error: 'nourl' });
+  assert.deepEqual(await sync.remoteCount(PASS), { ok: false, error: 'nourl' });
+  assert.equal(fetch.calls.length, 0);
+});
+
+test('push is blocked while unlinked', async () => {
+  const fetch = fakeFetch(() => ({ ok: true }));
+  const store = fakeStore({ expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }] });
+  const res = await mk(store, fetch).push();
+  assert.deepEqual(res, { ok: false, error: 'unlinked' });
+  assert.equal(fetch.calls.length, 0);
+  assert.equal(store.box.size, 1);
+});
+
+test('failed push keeps outbox', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1), exp('b', 2)],
+    outbox: [{ kind: 'expense', id: 'a' }, { kind: 'expense', id: 'b' }],
+  });
+  const fetch = async () => { throw new TypeError('offline'); };
+  const res = await mk(store, fetch).push();
+  assert.deepEqual(res, { ok: false, error: 'network' });
+  assert.equal(store.box.size, 2);
+  assert.equal(store.meta.lastError, 'network');
+  assert.equal(store.meta.lastSyncAt, null);
+});
+
+test('next push resends everything a failed push left behind', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+  });
+  let online = false;
+  const fetch = fakeFetch(() => { if (!online) throw new TypeError('offline'); return { ok: true }; });
+  const sync = mk(store, fetch);
+  assert.equal((await sync.push()).ok, false);
+  online = true;
+  assert.deepEqual(await sync.push(), { ok: true, pushed: 1 });
+  assert.equal(fetch.calls.length, 2);
+  assert.deepEqual(fetch.calls[1].body.expenses, [exp('a', 1)]);
+  assert.equal(store.box.size, 0);
+});
+
+for (const [name, handler, want] of [
+  ['HTTP 500', () => reply({ ok: true }, 500), 'server'],
+  ['unparseable JSON', () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } }), 'server'],
+  ['ok:false auth', () => ({ ok: false, error: 'auth' }), 'auth'],
+  ['ok:false other', () => ({ ok: false, error: 'boom' }), 'server'],
+  ['ok:false no error', () => ({ ok: false }), 'server'],
+]) {
+  test(`push error mapping: ${name} -> ${want}, outbox kept, lastError set`, async () => {
+    const store = fakeStore({
+      meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+    });
+    const res = await mk(store, fakeFetch(handler)).push();
+    assert.deepEqual(res, { ok: false, error: want });
+    assert.equal(store.box.size, 1);
+    assert.equal(store.meta.lastError, want);
+  });
+}
+
+test('successful push sends one upsert, clears sent entries, records sync time', async () => {
+  const store = fakeStore({
+    meta: { ...linkedMeta, lastError: 'network' },
+    expenses: [exp('a', 1), exp('b', 2)], categories: [cat('c1', 3)],
+    outbox: [{ kind: 'expense', id: 'a' }, { kind: 'category', id: 'c1' }],
+  });
+  const fetch = fakeFetch(() => ({ ok: true }));
+  const before = Date.now();
+  const res = await mk(store, fetch).push();
+  assert.deepEqual(res, { ok: true, pushed: 2 });
+  assert.equal(fetch.calls.length, 1);
+  const { url, init, body } = fetch.calls[0];
+  assert.equal(url, URL_);
+  assert.equal(init.method, 'POST');
+  assert.deepEqual(init.headers, { 'Content-Type': 'text/plain;charset=utf-8' });
+  assert.deepEqual(body, { op: 'upsert', pass: PASS, expenses: [exp('a', 1)], categories: [cat('c1', 3)] });
+  assert.equal(store.box.size, 0);
+  assert.equal(store.meta.lastError, null);
+  assert.ok(store.meta.lastSyncAt >= before);
+});
+
+test('passphrase never appears in the request URL', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+  });
+  const fetch = fakeFetch((body) =>
+    body.op === 'pull' ? { ok: true, expenses: [], categories: [] } : { ok: true, expenses: 1 });
+  const sync = mk(store, fetch);
+  await sync.push();
+  await sync.remoteCount(PASS);
+  await sync.link(PASS);
+  assert.ok(fetch.calls.length >= 3);
+  for (const c of fetch.calls) assert.ok(!c.url.includes(PASS), 'pass leaked into URL');
+});
+
+test('empty outbox while linked: ok, pushed 0, no request', async () => {
+  const fetch = fakeFetch(() => ({ ok: true }));
+  const store = fakeStore({ meta: linkedMeta, expenses: [exp('a', 1)] });
+  assert.deepEqual(await mk(store, fetch).push(), { ok: true, pushed: 0 });
+  assert.equal(fetch.calls.length, 0);
+});
+
+test('record re-edited during push stays in the outbox and is resent next time', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1), exp('b', 1)],
+    outbox: [{ kind: 'expense', id: 'a' }, { kind: 'expense', id: 'b' }],
+  });
+  const fetch = fakeFetch((body) => {
+    if (fetch.calls.length === 1) store.edit('expense', exp('a', 2, { amount: 5000 })); // mid-flight edit
+    return { ok: true };
+  });
+  const sync = mk(store, fetch);
+  assert.deepEqual(await sync.push(), { ok: true, pushed: 2 });
+  assert.deepEqual([...store.box.keys()], ['expense:a']);
+
+  assert.deepEqual(await sync.push(), { ok: true, pushed: 1 });
+  assert.deepEqual(fetch.calls[1].body.expenses, [exp('a', 2, { amount: 5000 })]);
+  assert.equal(store.box.size, 0);
+});
+
+test('outbox entry whose record is gone is cleared and not sent', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('b', 1)],
+    outbox: [{ kind: 'expense', id: 'ghost' }, { kind: 'expense', id: 'b' }],
+  });
+  const fetch = fakeFetch(() => ({ ok: true }));
+  const sync = mk(store, fetch);
+  assert.deepEqual(await sync.push(), { ok: true, pushed: 1 });
+  assert.deepEqual(fetch.calls[0].body.expenses, [exp('b', 1)]);
+  assert.equal(store.box.size, 0);
+
+  store.box.set('expense:ghost', { kind: 'expense', id: 'ghost' });
+  assert.deepEqual(await sync.push(), { ok: true, pushed: 0 });
+  assert.equal(fetch.calls.length, 1);
+  assert.equal(store.box.size, 0);
+});
+
+test('push while a push is in flight returns the in-flight promise', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+  });
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const fetch = fakeFetch(async () => { await gate; return { ok: true }; });
+  const sync = mk(store, fetch);
+  const p1 = sync.push();
+  const p2 = sync.push();
+  assert.equal(p1, p2);
+  release();
+  assert.deepEqual(await p1, { ok: true, pushed: 1 });
+  assert.equal(fetch.calls.length, 1);
+
+  store.edit('expense', exp('a', 2));
+  const p3 = sync.push();
+  assert.notEqual(p3, p1);
+  assert.deepEqual(await p3, { ok: true, pushed: 1 });
+  assert.equal(fetch.calls.length, 2);
+});
+
+test('failed push does not wedge single flight', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+  });
+  let fail = true;
+  const fetch = fakeFetch(() => { if (fail) throw new TypeError('x'); return { ok: true }; });
+  const sync = mk(store, fetch);
+  assert.equal((await sync.push()).error, 'network');
+  fail = false;
+  assert.equal((await sync.push()).ok, true);
+});
+
+test('auth error does not link', async () => {
+  const store = fakeStore({ expenses: [exp('a', 1)] });
+  const fetch = fakeFetch(() => ({ ok: false, error: 'auth' }));
+  const res = await mk(store, fetch).link('wrong');
+  assert.deepEqual(res, { ok: false, error: 'auth' });
+  assert.equal(store.meta.passphrase, null);
+  assert.equal(store.meta.linked, false);
+  assert.equal(store.putManyCalls.length, 0);
+  assert.equal(store.box.size, 0);
+  assert.equal(fetch.calls.length, 1);
+  assert.equal(fetch.calls[0].body.op, 'pull');
+});
+
+for (const [name, handler, want] of [
+  ['network', () => { throw new TypeError('offline'); }, 'network'],
+  ['HTTP 500', () => reply({}, 500), 'server'],
+  ['ok:false other', () => ({ ok: false, error: 'x' }), 'server'],
+  ['malformed pull body', () => ({ ok: true }), 'server'],
+]) {
+  test(`link pull error (${name}) returns ${want} and stores nothing`, async () => {
+    const store = fakeStore({ expenses: [exp('a', 1)] });
+    const res = await mk(store, fakeFetch(handler)).link(PASS);
+    assert.deepEqual(res, { ok: false, error: want });
+    assert.equal(store.meta.passphrase, null);
+    assert.equal(store.meta.linked, false);
+    assert.equal(store.putManyCalls.length, 0);
+    assert.equal(store.box.size, 0);
+  });
+}
+
+test('link merges then pushes', async () => {
+  const store = fakeStore({
+    expenses: [exp('local1', 1)], categories: [cat('c1', 1)],
+    outbox: [{ kind: 'expense', id: 'local1' }, { kind: 'category', id: 'c1' }],
+  });
+  const remote = [exp('r1', 1), exp('r2', 2), exp('r3', 3)];
+  const fetch = fakeFetch((body) =>
+    body.op === 'pull' ? { ok: true, expenses: remote, categories: [cat('c2', 2)] } : { ok: true });
+  const res = await mk(store, fetch).link(PASS);
+
+  assert.deepEqual(res, { ok: true, pulled: 4, pushed: 6 });
+  assert.equal(store.recs.expense.size, 4);
+  assert.equal(store.meta.passphrase, PASS);
+  assert.equal(store.meta.linked, true);
+  assert.equal(store.meta.lastError, null);
+  assert.deepEqual(fetch.calls.map((c) => c.body.op), ['pull', 'upsert']);
+  assert.equal(fetch.calls[0].body.pass, PASS);
+  const up = fetch.calls[1].body;
+  assert.deepEqual(up.expenses.map((e) => e.id).sort(), ['local1', 'r1', 'r2', 'r3']);
+  assert.deepEqual(up.categories.map((c) => c.id).sort(), ['c1', 'c2']);
+  assert.equal(store.box.size, 0);
+});
+
+test('link writes only changed records and never overwrites newer local data', async () => {
+  const newerLocal = exp('a', 10, { amount: 777 });
+  const store = fakeStore({
+    expenses: [newerLocal, exp('same', 5)], categories: [cat('c1', 9)],
+  });
+  const fetch = fakeFetch((body) => body.op === 'pull'
+    ? { ok: true, expenses: [exp('a', 3, { amount: 1 }), exp('same', 5), exp('new', 1)], categories: [cat('c1', 2)] }
+    : { ok: true });
+  const res = await mk(store, fetch).link(PASS);
+  assert.equal(res.pulled, 1);
+  assert.deepEqual(store.putManyCalls, [['expense', [exp('new', 1)]]]);
+  assert.deepEqual(store.recs.expense.get('a'), newerLocal);
+  // local winners still reach the Sheet via markAllDirty
+  const sent = fetch.calls[1].body.expenses.find((e) => e.id === 'a');
+  assert.equal(sent.amount, 777);
+});
+
+test('link merges against local tombstones: a delete is not resurrected', async () => {
+  const tomb = exp('a', 10, { deleted: true });
+  const store = fakeStore({ expenses: [tomb] });
+  const fetch = fakeFetch((body) =>
+    body.op === 'pull' ? { ok: true, expenses: [exp('a', 5)], categories: [] } : { ok: true });
+  const res = await mk(store, fetch).link(PASS);
+  assert.equal(res.pulled, 0);
+  assert.deepEqual(store.recs.expense.get('a'), tomb);
+  assert.deepEqual(fetch.calls[1].body.expenses, [tomb]);
+});
+
+test('link still succeeds when the follow-up push fails; outbox keeps the changes', async () => {
+  const store = fakeStore({ expenses: [exp('local1', 1)] });
+  const fetch = fakeFetch((body) => {
+    if (body.op === 'pull') return { ok: true, expenses: [exp('r1', 1)], categories: [] };
+    throw new TypeError('offline');
+  });
+  const res = await mk(store, fetch).link(PASS);
+  assert.deepEqual(res, { ok: true, pulled: 1, pushed: 0, pushError: 'network' });
+  assert.equal(store.meta.linked, true);
+  assert.equal(store.meta.passphrase, PASS);
+  assert.equal(store.meta.lastError, 'network');
+  assert.deepEqual([...store.box.keys()].sort(), ['expense:local1', 'expense:r1']);
+});
+
+test('remoteCount returns the Sheet expense count', async () => {
+  const fetch = fakeFetch((body) => (body.pass === PASS ? { ok: true, expenses: 42 } : { ok: false, error: 'auth' }));
+  const sync = mk(fakeStore(), fetch);
+  assert.deepEqual(await sync.remoteCount(PASS), { ok: true, count: 42 });
+  assert.equal(fetch.calls[0].body.op, 'count');
+  assert.deepEqual(await sync.remoteCount('nope'), { ok: false, error: 'auth' });
+});
+
+test('remoteCount maps network and server errors', async () => {
+  const store = fakeStore();
+  const down = async () => { throw new TypeError('offline'); };
+  assert.deepEqual(await mk(store, down).remoteCount(PASS), { ok: false, error: 'network' });
+  assert.deepEqual(await mk(store, fakeFetch(() => reply({}, 502))).remoteCount(PASS), { ok: false, error: 'server' });
+});
