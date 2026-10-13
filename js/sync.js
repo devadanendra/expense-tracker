@@ -85,7 +85,7 @@ export function createSync({ url, fetch, store }) {
       if (changed.length) await store.putMany(kind, changed);
       pulled += changed.length;
     }
-    await store.setMeta({ passphrase: pass, linked: true, lastError: null });
+    await store.setMeta({ passphrase: pass, linked: true, lastError: null, url });
     await store.markAllDirty();
     // Let a push already running finish so the marked entries go out in a fresh one.
     if (inflight) await inflight.catch(() => {});

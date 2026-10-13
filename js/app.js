@@ -103,6 +103,14 @@ function renderSoon() {
   renderTimer = setTimeout(render, 30);
 }
 
+// A changed SHEET_URL points at a Sheet without what earlier pushes sent: queue everything once.
+async function adoptSheetUrl() {
+  const meta = await store.getMeta();
+  if (!SHEET_URL || !meta.linked || meta.url === SHEET_URL) return;
+  await store.markAllDirty();
+  await store.setMeta({ url: SHEET_URL });
+}
+
 export async function boot() {
   state.ym = localISO().slice(0, 7);
   navigator.storage?.persist?.().catch(() => {});
@@ -114,6 +122,7 @@ export async function boot() {
     document.getElementById('app').textContent = `Can't open storage: ${e.message}`;
     return;
   }
+  await adoptSheetUrl().catch((e) => console.error(e));
   document.querySelector('.nav .p').addEventListener('click', () => openEntry());
   addEventListener('hashchange', render);
   // Back from the background on a new day: refresh "Today" labels and the strip.

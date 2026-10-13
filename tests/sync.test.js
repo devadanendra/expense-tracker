@@ -333,6 +333,13 @@ test('link merges then pushes', async () => {
   assert.equal(store.box.size, 0);
 });
 
+test('link stores the Sheet url it linked to', async () => {
+  const store = fakeStore();
+  const fetch = fakeFetch((body) => (body.op === 'pull' ? { ok: true, expenses: [], categories: [] } : { ok: true }));
+  await mk(store, fetch).link(PASS);
+  assert.equal(store.meta.url, URL_);
+});
+
 test('csv import on a wiped phone, then restore: the Sheet\'s newer edit and delete win', async () => {
   const T_EXPORT = Date.UTC(2026, 8, 1);
   const T_EDIT = Date.UTC(2026, 9, 1);
