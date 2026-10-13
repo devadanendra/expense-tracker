@@ -25,7 +25,11 @@ function fakeStore({ meta = {}, expenses = [], categories = [], outbox = [] } = 
     getMeta: async () => ({ ...m }),
     setMeta: async (patch) => { Object.assign(m, patch); },
     getOutbox: async () => [...box.values()],
-    clearOutbox: async (entries) => entries.forEach((e) => box.delete(`${e.kind}:${e.id}`)),
+    // Same contract as store.js: an entry goes only if its record is still at the sent stamp (or gone).
+    clearOutbox: async (entries) => entries.forEach((e) => {
+      const rec = recs[e.kind].get(e.id);
+      if (!rec || rec.updatedAt === e.updatedAt) box.delete(`${e.kind}:${e.id}`);
+    }),
     getRecord: async (kind, id) => recs[kind].get(id),
     allExpenses: async () => [...recs.expense.values()],
     allCategories: async () => [...recs.category.values()],
@@ -35,9 +39,12 @@ function fakeStore({ meta = {}, expenses = [], categories = [], outbox = [] } = 
     },
     markAllDirty: async () => {
       for (const kind of ['expense', 'category'])
-        for (const id of recs[kind].keys()) box.set(`${kind}:${id}`, { kind, id });
+        for (const [id, r] of recs[kind]) box.set(`${kind}:${id}`, { kind, id, updatedAt: r.updatedAt });
     },
-    edit(kind, rec) { recs[kind].set(rec.id, rec); box.set(`${kind}:${rec.id}`, { kind, id: rec.id }); },
+    edit(kind, rec) {
+      recs[kind].set(rec.id, rec);
+      box.set(`${kind}:${rec.id}`, { kind, id: rec.id, updatedAt: rec.updatedAt });
+    },
   };
   return s;
 }
@@ -92,6 +99,33 @@ test('failed push keeps outbox', async () => {
   assert.equal(store.meta.lastSyncAt, null);
 });
 
+test('aborted (timed-out) request maps to network and keeps outbox; next push is not wedged', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+  });
+  let hang = true;
+  const fetch = async () => {
+    if (hang) throw new DOMException('The operation was aborted.', 'AbortError');
+    return reply({ ok: true });
+  };
+  const sync = mk(store, fetch);
+  assert.deepEqual(await sync.push(), { ok: false, error: 'network' });
+  assert.equal(store.box.size, 1);
+  hang = false;
+  assert.deepEqual(await sync.push(), { ok: true, pushed: 1 });
+});
+
+test('push hands clearOutbox the stamp it sent, not the current one', async () => {
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 7)], outbox: [{ kind: 'expense', id: 'a', updatedAt: 3 }], // stamp at mark time, older than the record's
+  });
+  let cleared;
+  const real = store.clearOutbox;
+  store.clearOutbox = async (entries) => { cleared = entries; return real(entries); };
+  await mk(store, fakeFetch(() => ({ ok: true }))).push();
+  assert.deepEqual(cleared, [{ kind: 'expense', id: 'a', updatedAt: 7 }]);
+});
+
 test('next push resends everything a failed push left behind', async () => {
   const store = fakeStore({
     meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
@@ -140,6 +174,7 @@ test('successful push sends one upsert, clears sent entries, records sync time',
   assert.equal(url, URL_);
   assert.equal(init.method, 'POST');
   assert.deepEqual(init.headers, { 'Content-Type': 'text/plain;charset=utf-8' });
+  assert.ok(init.signal instanceof AbortSignal, 'request must carry a timeout signal');
   assert.deepEqual(body, { op: 'upsert', pass: PASS, expenses: [exp('a', 1)], categories: [cat('c1', 3)] });
   assert.equal(store.box.size, 0);
   assert.equal(store.meta.lastError, null);

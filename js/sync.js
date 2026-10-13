@@ -19,6 +19,7 @@ export function createSync({ url, fetch, store }) {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // simple request: no CORS preflight
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(60000), // a hung request must not block every later push (single flight)
       });
     } catch {
       return fail('network');
@@ -40,12 +41,12 @@ export function createSync({ url, fetch, store }) {
 
     const outbox = await store.getOutbox();
     const gone = []; // entries whose record no longer exists: nothing to send
-    const sent = []; // { entry, updatedAt } as sent
+    const sent = []; // { kind, id, updatedAt } as sent
     const body = { op: 'upsert', pass: meta.passphrase, expenses: [], categories: [] };
     for (const entry of outbox) {
       const rec = await store.getRecord(entry.kind, entry.id);
       if (!rec) { gone.push(entry); continue; }
-      sent.push({ entry, updatedAt: rec.updatedAt });
+      sent.push({ kind: entry.kind, id: entry.id, updatedAt: rec.updatedAt });
       body[entry.kind === 'expense' ? 'expenses' : 'categories'].push(rec);
     }
     if (!sent.length) {
@@ -58,13 +59,9 @@ export function createSync({ url, fetch, store }) {
       await store.setMeta({ lastError: r.error });
       return r;
     }
-    // Clear only what was sent unchanged; a record re-edited mid-flight stays queued.
-    const done = [...gone];
-    for (const { entry, updatedAt } of sent) {
-      const cur = await store.getRecord(entry.kind, entry.id);
-      if (!cur || cur.updatedAt === updatedAt) done.push(entry);
-    }
-    await store.clearOutbox(done);
+    // The store clears an entry only if its record is still at the sent updatedAt, atomically,
+    // so a record re-edited mid-flight stays queued.
+    await store.clearOutbox([...gone, ...sent]);
     await store.setMeta({ lastError: null, lastSyncAt: Date.now() });
     return { ok: true, pushed: sent.length };
   }
