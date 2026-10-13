@@ -2,9 +2,13 @@ import * as store from './store.js';
 import { icon } from './icons.js';
 import { renderHome, localISO } from './ui/home.js';
 import { openEntrySheet } from './ui/entry-sheet.js';
+import { renderReports } from './ui/reports.js';
+import { renderSearch } from './ui/search.js';
+import { renderCategories } from './ui/categories.js';
 
-// Shared UI state. ym is the selected month ('YYYY-MM'), set in boot().
-export const state = { ym: '', restoreDismissed: false };
+// Shared UI state. ym is the selected month ('YYYY-MM'), set in boot(); report is the reports
+// segment ('categories' | 'weeks'); query is the search text.
+export const state = { ym: '', restoreDismissed: false, report: 'categories', query: '' };
 
 // Opens the entry sheet (expense undefined = new). The view re-renders itself via store.onChange.
 export function openEntry(expense) {
@@ -19,10 +23,10 @@ const placeholder = (title) => (root) => {
 
 const ROUTES = {
   '#/': renderHome,
-  '#/reports': placeholder('Reports'),
-  '#/search': placeholder('Search'),
+  '#/reports': renderReports,
+  '#/search': renderSearch,
   '#/settings': placeholder('Settings'),
-  '#/categories': placeholder('Categories'),
+  '#/categories': renderCategories,
 };
 const NAV_ROUTES = ['#/', '#/reports'];
 
@@ -31,6 +35,8 @@ let shown = '';
 
 // Renders the current route into a fresh container and swaps it in only if no newer render
 // started meanwhile, so overlapping async renders never leave stale data on screen.
+// A re-render of the same route keeps focus and caret on the element with the same id
+// (search typing survives store changes); entering a route focuses its [autofocus] element.
 export async function render() {
   const route = ROUTES[location.hash] ? location.hash : '#/';
   const my = ++seq;
@@ -44,7 +50,14 @@ export async function render() {
     view.firstChild.textContent = `Something went wrong: ${e.message ?? e}`;
   }
   if (my !== seq) return;
-  document.getElementById('app').replaceChildren(view);
+  const app = document.getElementById('app');
+  const prev = document.activeElement;
+  const keep = route === shown && prev?.id && app.contains(prev) ? prev : null;
+  const sel = [keep?.selectionStart, keep?.selectionEnd];
+  app.replaceChildren(view);
+  const next = keep ? document.getElementById(keep.id) : route !== shown ? view.querySelector('[autofocus]') : null;
+  next?.focus({ preventScroll: true });
+  if (sel[0] != null && next?.setSelectionRange) next.setSelectionRange(...sel);
   const nav = document.querySelector('.nav');
   nav.hidden = !NAV_ROUTES.includes(route);
   for (const a of nav.querySelectorAll('a')) {

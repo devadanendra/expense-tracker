@@ -197,6 +197,72 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 .k.go svg { width: 26px; height: 26px; stroke-width: 2.2; }
 .k.go:disabled { opacity: .35; cursor: default; }
 
+/* ---------- Reports ---------- */
+.rp { padding-bottom: 36px; }
+.seg { display: flex; padding: 3px; margin-top: 16px; border-radius: 12px; background: var(--ib); }
+.seg button { position: relative; flex: 1; height: 38px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--mu); }
+.seg button::after { content: ""; position: absolute; inset: -3px 0; } /* 44px tap target */
+.seg [aria-pressed="true"] { background: var(--surf); color: var(--tx); box-shadow: var(--sh1); }
+.rc { margin-top: 12px; padding: 4px 12px 8px; }
+.rc-row { padding: 9px 0; }
+.rc-top { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.rc-top .chip { width: 28px; height: 28px; }
+.rc-top .chip svg { width: 14px; height: 14px; }
+.rc-top .t1 { flex: 1; }
+.bar2 { height: 8px; margin-top: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar2 i { display: block; height: 100%; border-radius: 4px; }
+.wkc { margin-top: 12px; padding: 6px 12px 12px; }
+.wk { display: flex; align-items: flex-end; gap: 10px; height: 110px; padding: 12px 6px 0; }
+.wk div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--mu); white-space: nowrap; }
+.wk i { width: 100%; border-radius: 8px; background: var(--bar); }
+.wk i.f { height: 3px; background: var(--line); }
+.wk .cur { color: var(--tx); font-weight: 600; }
+.wk .cur i { background: var(--ac); }
+.wl { margin-top: 10px; }
+.sr { display: flex; align-items: center; gap: 11px; min-height: 50px; }
+.sr + .sr { border-top: 1px solid var(--line); }
+.wl .t1 { flex: 1; }
+
+/* ---------- Search ---------- */
+.qh { padding-top: 14px; }
+.qh .top { justify-content: flex-start; gap: 6px; }
+.qh .ib, .bar .ib { margin-left: -4px; }
+.qf {
+  flex: 1; min-width: 0; height: 44px; padding: 0 14px; border-radius: 22px;
+  display: flex; align-items: center; gap: 8px; background: var(--surf); color: var(--mu);
+}
+.qf:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
+.qf input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font: inherit; color: var(--tx); }
+.qf input::placeholder { color: var(--mu); }
+
+/* ---------- Categories ---------- */
+.cats { padding: 16px 14px 32px; }
+.cat { display: flex; align-items: center; }
+.cat + .cat { border-top: 1px solid var(--line); }
+.cat .row { flex: 1; min-width: 0; }
+.mv { width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--mu); }
+.mv:last-child { margin-right: -8px; }
+.mv:disabled { opacity: .3; cursor: default; }
+.lst.add { margin-top: 12px; }
+.add .chip { background: var(--bg2); color: var(--tx); }
+
+/* Category editor: a modal <dialog> drawn as a bottom sheet. */
+.ce {
+  position: fixed; inset: auto 0 0; width: 100%; max-width: 480px; max-height: calc(100% - 16px); margin: 0 auto; padding: 0;
+  border: 0; border-radius: 24px 24px 0 0; background: var(--surf); color: var(--tx);
+  overflow-y: auto; overscroll-behavior: contain; animation: es-up .24s ease-out;
+}
+.ce::backdrop { background: rgba(20, 18, 16, .38); }
+.ce:focus { outline: none; }
+.ce-f { padding: 8px 14px calc(14px + env(safe-area-inset-bottom)); }
+.ce-lbl { padding: 14px 4px 4px; font-size: 12px; font-weight: 600; color: var(--mu); }
+.pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px 0; justify-items: center; }
+.pick button { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.pick .chip { width: 32px; height: 32px; }
+.pick [aria-pressed="true"] .chip { box-shadow: 0 0 0 2px var(--surf), 0 0 0 4px var(--ac); }
+.ce .btn { width: 100%; margin-top: 18px; }
+.ce .btn:disabled { opacity: .35; cursor: default; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

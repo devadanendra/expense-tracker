@@ -20,6 +20,7 @@ const PATHS = {
   check: '<path d="m5 12 5 5L20 7"/>',
   back: '<path d="M20 12H8l4-4M8 12l4 4"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  'chevron-up': '<path d="m18 15-6-6-6 6"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   'chevron-left': '<path d="m15 18-6-6 6-6"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',

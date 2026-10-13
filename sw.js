@@ -21,8 +21,11 @@ const SHELL = [
   'js/stats.js',
   'js/store.js',
   'js/sync.js',
+  'js/ui/categories.js',
   'js/ui/entry-sheet.js',
   'js/ui/home.js',
+  'js/ui/reports.js',
+  'js/ui/search.js',
 ];
 
 self.addEventListener('install', (e) => {

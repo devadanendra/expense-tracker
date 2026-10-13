@@ -30,3 +30,8 @@ test('dayLabel: yesterday across month and year boundaries', () => {
   assert.equal(dayLabel('2026-12-31', '2027-01-01'), 'Yesterday · Thu 31');
   assert.equal(dayLabel('2026-02-28', '2026-03-01'), 'Yesterday · Sat 28');
 });
+
+test('dayLabel: withYear adds the year to older days only', () => {
+  assert.equal(dayLabel('2026-02-11', '2026-10-13', true), 'Wed 11 Feb 2026');
+  assert.equal(dayLabel('2026-10-12', '2026-10-13', true), 'Yesterday · Mon 12');
+});
