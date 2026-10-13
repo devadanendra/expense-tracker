@@ -144,18 +144,17 @@ export function bindMonth(root, state) {
 // --- view ---
 
 export async function renderHome(root, state) {
-  const [all, categories, storeEmpty, meta] = await Promise.all([
-    store.liveExpenses(), store.liveCategories(), store.isEmpty(), store.getMeta(),
+  const [all, categories, meta] = await Promise.all([
+    store.liveExpenses(), store.liveCategories(), store.getMeta(),
   ]);
   const today = localISO();
   const { ym } = state;
   const month = inMonth(all, ym);
   const cats = new Map(categories.map((c) => [c.id, c]));
 
-  let body;
-  if (SHEET_URL && storeEmpty && !meta.linked && !state.restoreDismissed) body = restoreCard();
-  else if (!month.length) body = emptyMonth();
-  else body = dayGroups(month, cats, (d) => dayLabel(d, today));
+  // Shown until linked, even with entries: the only sign on home that backup is paused.
+  const card = SHEET_URL && !meta.linked && !state.restoreDismissed ? restoreCard() : '';
+  const body = month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : card || emptyMonth();
 
   root.innerHTML = `<header class="hd">
     ${monthHeader(ym, total(month), `<div class="acts">
