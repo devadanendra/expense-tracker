@@ -21,6 +21,7 @@ const SHELL = [
   'js/stats.js',
   'js/store.js',
   'js/sync.js',
+  'js/ui/entry-sheet.js',
   'js/ui/home.js',
 ];
 

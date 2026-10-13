@@ -1,12 +1,16 @@
 import * as store from './store.js';
 import { icon } from './icons.js';
 import { renderHome, localISO } from './ui/home.js';
+import { openEntrySheet } from './ui/entry-sheet.js';
 
 // Shared UI state. ym is the selected month ('YYYY-MM'), set in boot().
 export const state = { ym: '', restoreDismissed: false };
 
-// Hooks later tasks fill in: Task 8 opens the entry sheet (expense undefined = new), Task 10 the restore flow.
-export function openEntry(expense) {}
+// Opens the entry sheet (expense undefined = new). The view re-renders itself via store.onChange.
+export function openEntry(expense) {
+  openEntrySheet({ expense }).catch((e) => console.error(e));
+}
+// Hook Task 10 fills in: the restore flow.
 export function startRestore() {}
 
 const placeholder = (title) => (root) => {

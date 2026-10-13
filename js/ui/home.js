@@ -33,7 +33,7 @@ export function dayLabel(iso, todayISO) {
   return `${day} ${MONTHS[m - 1].slice(0, 3)}`;
 }
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // --- pieces ---
 
