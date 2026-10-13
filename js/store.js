@@ -114,6 +114,24 @@ export async function clearOutbox(entries) {
   if (cleared) emit();
 }
 
+// CSV import: writes only ids not stored yet and keeps their updatedAt (0 from fromCSV), so on a
+// later restore the Sheet's newer edits and deletes win. Queued for sync. Returns the count written.
+export async function importExpenses(recs) {
+  const n = await run(['expenses', 'outbox'], 'readwrite', async (s) => {
+    let written = 0;
+    for (const rec of recs) {
+      if (!Number.isSafeInteger(rec.amount) || rec.amount <= 0) throw new RangeError('amount must be a positive integer');
+      if (await db.get(s.expenses, rec.id)) continue;
+      await db.put(s.expenses, rec);
+      await mark(s, 'expense', rec);
+      written++;
+    }
+    return written;
+  });
+  if (n) emit();
+  return n;
+}
+
 export const markAllDirty = () => write(['expenses', 'categories', 'outbox'], async (s) => {
   for (const kind of Object.keys(STORE)) {
     for (const rec of await db.getAll(s[STORE[kind]])) await mark(s, kind, rec);

@@ -95,8 +95,8 @@ export async function render() {
   shown = route;
 }
 
-// Store changes re-render once a burst of writes settles: a CSV import saves each row, and a
-// full re-render per row made a 1000-row import take ~10 s on desktop (~1 min from home).
+// Store changes re-render once a burst of writes settles: link and push each fire several
+// (putMany, setMeta, markAllDirty, clearOutbox), and a CSV import one per new category.
 let renderTimer = 0;
 function renderSoon() {
   clearTimeout(renderTimer);

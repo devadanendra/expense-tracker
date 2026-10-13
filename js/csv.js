@@ -57,7 +57,8 @@ const validTime = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const AMOUNT_RE = /^(Rp\s*)?(\d+|\d{1,3}(\.\d{3})+)$/i;
 
 // Imported expenses get updatedAt 0 so mergeRecords never lets them overwrite an existing id
-// (re-import is idempotent; local tombstones stay deleted). Callers may restamp `changed` rows.
+// (re-import is idempotent; local tombstones stay deleted). Callers must keep the 0: a restamp
+// would let an old CSV beat the Sheet's newer edits and deletes on a later restore.
 export function fromCSV(text, categories, now) {
   const fail = (msg) => ({ expenses: [], newCategories: [], errors: [msg] });
   const rows = parseCSV(text);

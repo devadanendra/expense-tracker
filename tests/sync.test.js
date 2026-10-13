@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSync } from '../js/sync.js';
+import { toCSV } from '../js/csv.js';
+import { planImport } from '../js/ui/settings.js';
+import { DEFAULT_CATEGORIES } from '../js/categories.js';
 
 const URL_ = 'https://script.example/exec';
 const PASS = 'secret-pass';
@@ -40,6 +43,12 @@ function fakeStore({ meta = {}, expenses = [], categories = [], outbox = [] } = 
     markAllDirty: async () => {
       for (const kind of ['expense', 'category'])
         for (const [id, r] of recs[kind]) box.set(`${kind}:${id}`, { kind, id, updatedAt: r.updatedAt });
+    },
+    // Same contract as store.js: only absent ids, stamp kept, queued.
+    importExpenses: async (list) => {
+      const fresh = list.filter((r) => !recs.expense.has(r.id));
+      fresh.forEach((r) => s.edit('expense', r));
+      return fresh.length;
     },
     edit(kind, rec) {
       recs[kind].set(rec.id, rec);
@@ -322,6 +331,37 @@ test('link merges then pushes', async () => {
   assert.deepEqual(up.expenses.map((e) => e.id).sort(), ['local1', 'r1', 'r2', 'r3']);
   assert.deepEqual(up.categories.map((c) => c.id).sort(), ['c1', 'c2']);
   assert.equal(store.box.size, 0);
+});
+
+test('csv import on a wiped phone, then restore: the Sheet\'s newer edit and delete win', async () => {
+  const T_EXPORT = Date.UTC(2026, 8, 1);
+  const T_EDIT = Date.UTC(2026, 9, 1);
+  const old = [
+    exp('a', T_EXPORT, { categoryId: 'cat-food', amount: 50000, note: 'typo amount' }),
+    exp('b', T_EXPORT, { categoryId: 'cat-food', note: 'deleted later' }),
+    exp('c', T_EXPORT, { categoryId: 'cat-food', note: 'never synced' }),
+  ];
+  const csv = toCSV(old, DEFAULT_CATEGORIES); // exported Sep 1
+  const sheet = [
+    { ...old[0], amount: 5000, updatedAt: T_EDIT }, // fixed in Oct
+    { ...old[1], deleted: true, updatedAt: T_EDIT }, // deleted in Oct
+  ];
+  const store = fakeStore({ categories: DEFAULT_CATEGORIES }); // wiped and reseeded
+  const plan = planImport(csv, await store.allExpenses(), await store.allCategories(), Date.UTC(2026, 9, 13));
+  assert.equal(await store.importExpenses(plan.expenses), 3);
+
+  const fetch = fakeFetch((body) => (body.op === 'pull' ? { ok: true, expenses: sheet, categories: [] } : { ok: true }));
+  const res = await mk(store, fetch).link(PASS);
+  assert.equal(res.pulled, 2);
+  const local = (id) => store.recs.expense.get(id);
+  assert.equal(local('a').amount, 5000);
+  assert.equal(local('b').deleted, true);
+  assert.equal(local('c').updatedAt, 0);
+  const pushed = new Map(fetch.calls[1].body.expenses.map((e) => [e.id, e]));
+  assert.deepEqual(pushed.get('a'), sheet[0]);
+  assert.deepEqual(pushed.get('b'), sheet[1]);
+  assert.equal(pushed.get('c').note, 'never synced');
+  assert.equal(store.box.size, 0, 'stamp-0 entries clear like any other');
 });
 
 test('link writes only changed records and never overwrites newer local data', async () => {

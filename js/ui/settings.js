@@ -185,7 +185,7 @@ async function openExport() {
 function openImport() {
   const dlg = openSheet('Import CSV', `<form>
     <button class="btn" type="button" data-act="file">Choose file</button>
-    <input type="file" accept=".csv,text/csv" hidden>
+    <input type="file" accept=".csv,text/csv,text/comma-separated-values" hidden>
     <p class="ce-lbl">Or paste</p>
     <textarea class="note" rows="5" required aria-label="CSV text" placeholder="date,time,amount,category,note,id"></textarea>
     <ul class="es-err imp-err" role="alert" hidden></ul>
@@ -200,14 +200,14 @@ function openImport() {
     try {
       const plan = planImport(await read(), await store.allExpenses(), await store.allCategories(), Date.now());
       for (const c of plan.categories) await store.saveCategory(c); // categories first: no dangling ids
-      for (const e of plan.expenses) await store.saveExpense(e); // restamps and queues each for sync
+      const n = await store.importExpenses(plan.expenses); // keeps stamp 0: a later restore lets the Sheet win
       if (plan.errors.length) {
         err.innerHTML = plan.errors.map((m) => `<li>${esc(m)}</li>`).join('');
         err.hidden = false;
       } else {
         dlg.close();
       }
-      toast(`Imported ${plan.expenses.length}, skipped ${plan.errors.length}`);
+      toast(`Imported ${n}, skipped ${plan.errors.length}`);
     } catch (e) {
       console.error(e);
       sayIn(dlg, err)(`Couldn't import: ${e.message ?? e}`);
