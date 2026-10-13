@@ -10,7 +10,7 @@ The app keeps your expenses on your phone. This one-time setup gives it a Google
 
 3. **Paste the code.** Delete everything in the editor. Open `apps-script/Code.gs` from this repository, copy all of it, paste it into the editor, and press the save icon (or Ctrl+S).
 
-4. **Choose a passphrase.** Make it long: a sentence of 4 or more random words, or 25+ characters (for example `purple-tractor-lemon-orbit-7`). Do not reuse a password from anywhere else, and do not start or end it with a space. You will type it once into the app, and Chrome Password Manager will offer to remember it, so it does not need to be easy to type.
+4. **Choose a passphrase.** Make it long: 4 or more random words and a number, made up by you, 25+ characters in all. Never use an example from a guide, do not reuse a password from anywhere else, and do not start or end it with a space. You will type it once into the app, and Chrome Password Manager will offer to remember it, so it does not need to be easy to type.
 
 5. **Save the passphrase in the script.** In the editor, click the gear icon (**Project Settings**), scroll to **Script properties**, click **Add script property**, set the property to `PASSPHRASE` (capital letters, exactly) and the value to your passphrase, then click **Save script properties**. The passphrase now lives only in your Google account. Never put it in this repository.
 
@@ -38,9 +38,13 @@ The app keeps your expenses on your phone. This one-time setup gives it a Google
     export const SHEET_URL = 'https://script.google.com/macros/s/XXXX/exec';
     ```
 
+    In the same commit, open `sw.js` and change the `CACHE` version to the next one (for example `et-v1` to `et-v2`). An installed app keeps serving its cached `js/config.js` until `sw.js` changes.
+
     Commit and push, then wait for GitHub Pages to publish. The URL is not a secret and may be committed. The passphrase is the secret and must never be committed.
 
 11. **Connect the phone.** In the app open **Settings › Google Sheet sync**, enter the passphrase, and tap **Connect**. Accept Chrome's offer to save the password. The first connection creates the two tabs in your Sheet.
+
+12. **Check the backup.** In the app, save an expense with the note `=1+1 '90s 1/2`. When **Settings › Google Sheet sync** shows **Synced**, open the Sheet's `Expenses` tab. The note cell must show exactly `=1+1 '90s 1/2` (not `2`), and the date cell must show text like `2026-10-13`. If either differs, the tabs were probably made by hand, not by the script: delete the `Expenses` and `Categories` tabs, then tap **Settings › Restore from Sheet** and restore. The script recreates both tabs and the app sends everything again. If the check still fails, open an issue in this repository. Delete the test expense afterwards.
 
 ## Why "Anyone" is safe
 
