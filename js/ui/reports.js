@@ -47,9 +47,7 @@ export async function renderReports(root, state) {
   const cats = new Map(categories.map((c) => [c.id, c]));
   const mode = state.report;
 
-  let body;
-  if (mode === 'weeks') body = weekChart(month, ym, today);
-  else body = month.length ? categoryList(month, cats) : emptyMonth();
+  const body = !month.length ? emptyMonth() : mode === 'weeks' ? weekChart(month, ym, today) : categoryList(month, cats);
 
   root.innerHTML = `<header class="hd rp">
     ${monthHeader(ym, total(month))}
