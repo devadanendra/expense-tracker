@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { syncStatus, planImport } from '../js/ui/settings.js';
+import { syncStatus, planImport, storageLine } from '../js/ui/settings.js';
 import { toCSV } from '../js/csv.js';
 import { DEFAULT_CATEGORIES } from '../js/categories.js';
 
@@ -51,4 +51,17 @@ test('planImport: keeps only new expenses and the new categories they use', () =
   assert.deepEqual(plan.categories.map((c) => c.name), ['Pets']);
   assert.equal(plan.expenses[0].categoryId, plan.categories[0].id);
   assert.deepEqual(plan.errors, ['Row 4: invalid amount']);
+});
+
+test('storageLine: protection state plus usage in KB or MB, one decimal', () => {
+  assert.equal(storageLine(true, 1.2 * 1024 * 1024), 'Protected · 1.2 MB used');
+  assert.equal(storageLine(false, 1536), 'Not protected · 1.5 KB used');
+  assert.equal(storageLine(false, 512 * 1024), 'Not protected · 512.0 KB used');
+  assert.equal(storageLine(true, 1000 * 1024), 'Protected · 1.0 MB used'); // never "1024.0 KB"
+  assert.equal(storageLine(true, 0), 'Protected · 0.0 KB used');
+});
+
+test('storageLine: usage left out when the browser gives none', () => {
+  assert.equal(storageLine(true, undefined), 'Protected');
+  assert.equal(storageLine(false, null), 'Not protected');
 });

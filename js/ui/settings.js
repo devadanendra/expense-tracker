@@ -3,7 +3,7 @@ import { SHEET_URL } from '../config.js';
 import { toCSV, fromCSV } from '../csv.js';
 import { mergeRecords } from '../merge.js';
 import { icon } from '../icons.js';
-import { sync } from '../app.js';
+import { sync, render } from '../app.js';
 import { esc, localISO } from './home.js';
 
 const NOT_SET_UP = 'Not set up — see SETUP.md';
@@ -11,6 +11,8 @@ const UNREACHABLE = "Can't reach Google — will retry";
 const PASS_HINT = 'Enter the passphrase you set in the Apps Script.';
 const FORM_ERRORS = { auth: 'Wrong passphrase', nourl: NOT_SET_UP }; // anything else: can't reach
 
+const PROTECT_HINT = "Chrome protects this app's data once it's installed. Open Chrome's ⋮ menu › Add to Home screen"
+  + ' (or Install app), then open the app from your home screen. Keep Sheet sync or a CSV export as a backup.';
 const THEMES = { system: 'System', light: 'Light', dark: 'Dark' };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -31,6 +33,14 @@ export function syncStatus({ url, meta, pending, now }) {
   if (meta.lastError) return UNREACHABLE;
   if (pending) return `${plural(pending, 'change')} waiting`;
   return `Synced ${ago(now - (meta.lastSyncAt ?? now))}`;
+}
+
+// Storage row subtitle. usage in bytes from navigator.storage.estimate(); left out when unknown.
+export function storageLine(persisted, usage) {
+  const state = persisted ? 'Protected' : 'Not protected';
+  if (typeof usage !== 'number') return state;
+  const kb = usage / 1024;
+  return `${state} · ${kb < 1000 ? `${kb.toFixed(1)} KB` : `${(kb / 1024).toFixed(1)} MB`} used`;
 }
 
 // What a CSV import writes: only expenses whose id is not here yet (imported rows carry
@@ -229,6 +239,19 @@ function openImport() {
   });
 }
 
+// Storage row: ask Chrome to keep the data (it says yes once the app is installed), else explain.
+async function protect() {
+  let ok = false;
+  try { ok = await navigator.storage.persist(); } catch { /* no Storage API: same advice */ }
+  if (!ok) {
+    openSheet('Protect your data', `<p class="ce-txt">${PROTECT_HINT}</p>
+      <div class="btns"><button class="btn primary" type="button" data-act="close">OK</button></div>`);
+    return;
+  }
+  toast('Storage protected');
+  render();
+}
+
 // --- view ---
 
 // One row: a button (act), a link (href), or inert text. Ids let render() keep focus on re-render.
@@ -242,9 +265,10 @@ function row({ ico, title, sub = '', end = '', act, href }) {
 }
 
 export async function renderSettings(root) {
-  const [meta, outbox, expenses, cats, persisted] = await Promise.all([
+  const [meta, outbox, expenses, cats, persisted, estimate] = await Promise.all([
     store.getMeta(), store.getOutbox(), store.liveExpenses(), store.liveCategories(),
     Promise.resolve(navigator.storage?.persisted?.()).catch(() => false),
+    Promise.resolve(navigator.storage?.estimate?.()).catch(() => undefined),
   ]);
   const status = syncStatus({ url: SHEET_URL, meta, pending: outbox.length, now: Date.now() });
   const fixable = SHEET_URL && (!meta.linked || meta.lastError === 'auth');
@@ -255,7 +279,7 @@ export async function renderSettings(root) {
     <h2 class="sg">Data safety</h2>
     <div class="lst">
       ${row({ ico: 'cloud', title: 'Google Sheet sync', sub: status, act: fixable && 'connect', end: on ? '<span class="dot"></span>On' : '' })}
-      ${row({ ico: 'shield', title: 'Storage', sub: persisted ? 'Protected' : 'Not protected — install the app to your home screen' })}
+      ${row({ ico: 'shield', title: 'Storage', sub: storageLine(persisted, estimate?.usage), act: 'storage' })}
       ${row({ ico: 'back', title: 'Restore from Sheet', sub: SHEET_URL ? '' : NOT_SET_UP, act: SHEET_URL && 'restore' })}
     </div>
     <h2 class="sg">Data</h2>
@@ -282,6 +306,7 @@ export async function renderSettings(root) {
       case 'connect': return openPassphrase('connect');
       case 'restore': return openPassphrase('restore');
       case 'import': return openImport();
+      case 'storage': return protect();
       case 'export': return openExport().catch((e) => { console.error(e); toast(`Couldn't export: ${e.message ?? e}`); });
     }
   });
