@@ -62,6 +62,19 @@ const ROUTES = {
   '#/categories': renderCategories,
 };
 const NAV_ROUTES = ['#/', '#/reports'];
+const page = () => (ROUTES[location.hash] ? location.hash : '#/');
+
+// Transactions (#/) is the history root and every other page sits one entry above it, so one
+// system back returns home and back on home leaves the app. Every in-app link comes through here.
+function navigate(hash) {
+  const from = page();
+  if (hash === from) return;
+  if (hash === '#/' && history.state?.sub) return history.back(); // hashchange renders home
+  if (hash === '#/') history.replaceState(null, '', '#/');
+  else if (from === '#/') history.pushState({ sub: 1 }, '', hash);
+  else history.replaceState({ sub: 1 }, '', hash);
+  render();
+}
 
 let seq = 0;
 let shown = '';
@@ -71,7 +84,7 @@ let shown = '';
 // A re-render of the same route keeps focus and caret on the element with the same id
 // (search typing survives store changes); entering a route focuses its [autofocus] element.
 export async function render() {
-  const route = ROUTES[location.hash] ? location.hash : '#/';
+  const route = page();
   const my = ++seq;
   const view = document.createElement('div');
   view.className = 'view';
@@ -139,7 +152,21 @@ export async function boot() {
   }
   await adoptSheetUrl().catch((e) => console.error(e));
   document.querySelector('.nav .p').addEventListener('click', () => openEntry());
+  // Links, tapped or Enter-activated (both fire click). Back/forward still render via hashchange.
+  document.addEventListener('click', (ev) => {
+    const a = ev.target.closest('a[href^="#/"]');
+    if (!a) return;
+    ev.preventDefault();
+    navigate(a.getAttribute('href'));
+  });
   addEventListener('hashchange', route);
+  // Cold start on another page: put Transactions under it, so the first back lands there.
+  // A reload or restored tab keeps its own state and already has it.
+  if (page() !== '#/' && !history.state) {
+    const hash = location.hash;
+    history.replaceState(null, '', '#/');
+    history.pushState({ sub: 1 }, '', hash);
+  }
   // Back from the background on a new day: refresh "Today" labels and the strip.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
