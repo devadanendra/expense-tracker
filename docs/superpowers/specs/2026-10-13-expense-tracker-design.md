@@ -67,11 +67,11 @@ Three layers:
 ## Features (replicating Natauang)
 
 - **Home / Transactions:** month picker (prev/next, tap title to jump back to current month); month total; comparison vs last month at the same point in the month (e.g. "↓ Rp 310.000 vs last month"); 31-day spending strip with today highlighted; expenses grouped by day with day subtotal ("Today · Tue 13"). Rows: note as main line, "Category · time" below, amount right. If no note, category name is the main line. Tap a row to edit or delete.
-- **Add / edit expense:** bottom sheet. Large amount display, calculator keypad (AC, ÷, ×, backspace, digits, 000, −, +, save). Shows the running expression under the amount. Category grid (4 columns). Date chips: Today (default), Yesterday, calendar picker. Note chip opens a text field.
-- **Categories:** start with 12, in English: Food & Drink, Transport, Groceries, Bills, Shopping, Home, Health, Fun, Subscriptions, Self-care, Business, Other. Each has a line icon and a color from the app's earthy palette. Owner can add, rename, recolor, reorder, delete (delete must handle existing expenses, e.g. move them to Other).
+- **Add / edit expense:** bottom sheet (UX v2, 2026-10-16; board `Main.dc.html`). Large amount display, calculator keypad 4×5 (AC, ×, ÷, backspace, digits, 000, −, +, tall save). Shows the running expression under the amount. Category pill (opens a 4-column picker panel) plus a scrollable row of emoji circles. Date row: date (native picker) and a "Yesterday?" / "Today?" link. Note row. No X button: closes by scrim tap, drag down, Android back or Escape.
+- **Categories:** start with 12, in English: Food & Drink, Transport, Groceries, Bills, Shopping, Home, Health, Fun, Subscriptions, Self-care, Business, Other. Each has an icon (emoji, see below) and a color from the app's earthy palette. Owner can add, rename, recolor, reorder, delete (delete must handle existing expenses, e.g. move them to Other).
 - **Search:** across all months, by note or category name.
 - **Reports:** for the selected month, segmented control: Categories (rows with icon, name, amount, proportional colored bar) and Weeks (bar chart for 1–7, 8–14, 15–21, 22–28, 29–end, current week in accent, plus a list of weekly totals).
-- **Settings:** grouped. Data safety: Google Sheet sync (status "Synced 2 min ago" / pending count / error), Restore from Sheet. Data: Export CSV (download or copy, shows expense count), Import CSV (file or paste). General: Categories.
+- **Settings:** grouped. Data safety: Google Sheet sync (status "Synced 2 min ago" / pending count / error), Restore from Sheet. Data: Export CSV (download or copy, shows expense count), Import CSV (file or paste). Storage row shows protection and usage (tap asks Chrome to protect the data, else explains installing). General: Categories, Appearance (System / Light / Dark).
 - **Empty month:** quiet icon, "No expenses yet", "Tap + to log your first one." (When the whole store is empty, show the restore offer instead.)
 - **Language:** English UI. **Currency:** Rupiah, Indonesian grouping, e.g. `Rp 2.450.000`.
 
@@ -80,12 +80,12 @@ Three layers:
 Reference mockup: `docs/design/mockup.html` (screens: home, add, reports ×2, settings, empty, dark home, dark add).
 
 - **Direction:** "Stone & Ink." Calm and premium in the spirit of Apple's restraint, but its own: no iOS conventions copied, no Nike-style heavy type, no mascot.
-- **Font:** Plus Jakarta Sans (400/500/600/700). Tabular numbers for amounts. Big total ~36px weight 600, tight letter-spacing.
+- **Font:** Figtree (400/500/600/700; owner decision 2026-10-16, was Plus Jakarta Sans). Tabular numbers for amounts. Big total ~36px weight 600, tight letter-spacing.
 - **Color tokens (light):** header/page `#e9e5de`, sheet background `#f5f3ef`, surface `#ffffff`, text `#1c1917`, muted `#78716c`, divider `#ece8e2`, accent ink `#3a4bd8`, positive `#3f7a5f`.
-- **Dark (follows system setting):** warm dark, not pure black. Header `#26221e`, sheet `#141210`, surface `#1f1c19`, text `#f5f3ef`, muted `#a8a29e`, accent `#8b97ff`.
-- **Category palette (earthy, solid circles, white line icons):** `#c2643c`, `#b8862b`, `#4d7c6b`, `#6b62b5`, `#a85a7a`, `#7a6a55`, `#c0504d`, `#3f7fa0` (+ more in the same family for 12).
+- **Dark (follows system setting unless Settings › Appearance forces light or dark):** warm dark, not pure black. Header `#26221e`, sheet `#141210`, surface `#1f1c19`, text `#f5f3ef`, muted `#a8a29e`, accent `#8b97ff`.
+- **Category palette (earthy; shown as an 18% pastel tint behind the category emoji):** `#c2643c`, `#b8862b`, `#4d7c6b`, `#6b62b5`, `#a85a7a`, `#7a6a55`, `#c0504d`, `#3f7fa0` (+ more in the same family for 12).
 - **Layout:** stone header holds month, total, comparison and strip; the content sheet (rounded top 24px) rises over it, Natauang-style. Lists are white rounded cards with hairline dividers. Floating capsule nav at bottom: Transactions · round ink "+" · Reports. Search and Settings as round icon buttons in the header.
-- **Icons:** one consistent line-icon set (SVG, ~1.8–2px stroke). No emoji as icons.
+- **Icons:** UI icons are one consistent line-icon set (SVG, ~1.8–2px stroke). Category icons are emoji on pastel circles (owner decision 2026-10-16); records keep icon keys, mapped to emoji in one table.
 - **Accessibility:** tap targets ≥44px, text contrast ≥4.5:1, visible focus, respects reduced motion.
 
 ## Tech shape (my call, not discussed in depth)
