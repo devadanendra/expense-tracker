@@ -1,9 +1,9 @@
 import * as store from '../store.js';
-import { CATEGORY_COLORS, DEFAULT_CATEGORIES, OTHER_ID } from '../categories.js';
+import { CATEGORY_COLORS, EMOJI, OTHER_ID } from '../categories.js';
 import { icon } from '../icons.js';
-import { esc, safeColor } from './home.js';
+import { esc, safeColor, chip } from './home.js';
 
-const ICONS = DEFAULT_CATEGORIES.map((c) => c.icon);
+const ICONS = Object.keys(EMOJI);
 
 // Add / edit / delete sheet. A native modal <dialog> on <body>: it survives view re-renders, makes
 // the page behind inert, and closes on Escape (and Android back, Chrome 120+).
@@ -31,7 +31,7 @@ function openEditor(cat, cats) {
     </div>
     <p class="ce-lbl">Icon</p>
     <div class="pick" role="group" aria-label="Icon">${ICONS.map((k) =>
-      `<button type="button" data-icon="${k}" aria-label="Icon ${k}"><span class="chip">${icon(k)}</span></button>`).join('')}
+      `<button type="button" data-icon="${k}" aria-label="Icon ${k}"><span class="chip">${EMOJI[k]}</span></button>`).join('')}
     </div>
     <p class="es-err" role="alert" hidden></p>
     <button class="btn primary" type="submit">Save</button>
@@ -45,7 +45,7 @@ function openEditor(cat, cats) {
     for (const b of dlg.querySelectorAll('[data-color]')) b.setAttribute('aria-pressed', b.dataset.color === color);
     for (const b of dlg.querySelectorAll('[data-icon]')) {
       b.setAttribute('aria-pressed', b.dataset.icon === ico);
-      b.firstChild.style.background = color;
+      b.firstChild.style.setProperty('--c', safeColor(color));
     }
     dlg.querySelector('[type=submit]').disabled = busy || !name.value.trim();
     const del = dlg.querySelector('[data-act=delete]');
@@ -100,7 +100,7 @@ export async function renderCategories(root) {
   <section class="cats">
     <div class="lst">${cats.map((c, i) => `<div class="cat">
       <button class="row" type="button" data-edit="${i}">
-        <span class="chip" style="background:${safeColor(c.color)}">${icon(c.icon)}</span>
+        ${chip(c)}
         <span class="t1">${esc(c.name)}</span>
       </button>
       <button class="mv" id="up-${esc(c.id)}" type="button" data-move="${i}" data-to="${i - 1}" aria-label="Move ${esc(c.name)} up"${i ? '' : ' disabled'}>${icon('chevron-up')}</button>

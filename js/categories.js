@@ -19,3 +19,15 @@ export const DEFAULT_CATEGORIES = [
 export const CATEGORY_COLORS = DEFAULT_CATEGORIES.map((c) => c.color);
 
 export const OTHER_ID = 'cat-other';
+
+// Category icon key -> emoji. Records keep the key; the first 12 are the defaults' keys,
+// the rest are extra choices in the category editor.
+export const EMOJI = {
+  food: '🍜', car: '🚗', cart: '🛒', bill: '🧾', bag: '🛍️', home: '🏠',
+  heart: '💊', play: '🎬', repeat: '🔁', sparkle: '💅', briefcase: '💼', dots: '📌',
+  coffee: '☕', gift: '🎁', plane: '✈️', book: '📚', phone: '📱', fuel: '⛽',
+  baby: '🍼', pet: '🐾', sport: '⚽', game: '🎮', beauty: '💄', edu: '🎓',
+};
+
+// Unknown keys (e.g. from a restored Sheet or an older version) show the Other pin.
+export const emoji = (key) => (Object.hasOwn(EMOJI, key) ? EMOJI[key] : EMOJI.dots);

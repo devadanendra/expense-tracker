@@ -3,7 +3,7 @@ import { createCalc } from '../calc.js';
 import { formatNum } from '../money.js';
 import { OTHER_ID } from '../categories.js';
 import { icon } from '../icons.js';
-import { esc, safeColor, localISO, dayLabel } from './home.js';
+import { esc, chip, localISO, dayLabel } from './home.js';
 
 const OP_LABELS = { AC: 'Clear', '÷': 'Divide', '×': 'Multiply', back: 'Backspace', '-': 'Minus', '+': 'Plus' };
 const FACES = { back: icon('back'), '-': '−' };
@@ -61,7 +61,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     <p class="amtIn num" aria-live="polite"><span class="rp">Rp</span><span class="v"></span></p>
     <p class="expr num"></p>
     <div class="grid" role="group" aria-label="Category">${cats.map((c) => `<button class="gc" type="button" data-cat="${esc(c.id)}">
-      <span class="chip" style="background:${safeColor(c.color)}">${icon(c.icon)}</span><span class="gl">${esc(c.name)}</span></button>`).join('')}
+      ${chip(c)}<span class="gl">${esc(c.name)}</span></button>`).join('')}
     </div>
     <div class="chips" role="group" aria-label="Date">
       <button class="dc" type="button" data-date="${today}">Today</button>

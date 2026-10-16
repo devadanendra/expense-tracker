@@ -1,9 +1,8 @@
 import * as store from '../store.js';
 import { inMonth, total, byCategory, byWeek } from '../stats.js';
 import { formatNum, formatRp } from '../money.js';
-import { icon } from '../icons.js';
 import { render } from '../app.js';
-import { localISO, esc, safeColor, monthHeader, bindMonth, emptyMonth, FALLBACK_CAT } from './home.js';
+import { localISO, esc, safeColor, chip, monthHeader, bindMonth, emptyMonth, FALLBACK_CAT } from './home.js';
 
 const MODES = { categories: 'Categories', weeks: 'Weeks' };
 const BAR_MAX = 72; // px height of the tallest week bar
@@ -14,7 +13,7 @@ function categoryList(month, cats) {
     const c = cats.get(categoryId) ?? { ...FALLBACK_CAT, name: categoryId };
     return `<div class="rc-row">
       <div class="rc-top">
-        <span class="chip" style="background:${safeColor(c.color)}">${icon(c.icon)}</span>
+        ${chip(c)}
         <span class="t1">${esc(c.name)}</span>
         <span class="amt num">${formatNum(t)}</span>
       </div>

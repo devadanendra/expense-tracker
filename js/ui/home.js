@@ -1,7 +1,7 @@
 import * as store from '../store.js';
 import { inMonth, total, byDay, dailyStrip, compareToLastMonth } from '../stats.js';
 import { formatNum, formatRp } from '../money.js';
-import { DEFAULT_CATEGORIES, OTHER_ID } from '../categories.js';
+import { DEFAULT_CATEGORIES, OTHER_ID, emoji } from '../categories.js';
 import { icon } from '../icons.js';
 import { SHEET_URL } from '../config.js';
 import { openEntry, startRestore, render } from '../app.js';
@@ -38,6 +38,10 @@ export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 
 // A synced category color goes into style=""; anything but a hex color could smuggle extra CSS (url() beacons).
 export const safeColor = (c) => (/^#[0-9a-f]{3,8}$/i.test(c) ? c : '#8a8178');
+
+// Category emoji on a pastel tint of its color (.chip in styles.css). Hidden from screen
+// readers: the category name sits next to it.
+export const chip = (c) => `<span class="chip" style="--c:${safeColor(c.color)}" aria-hidden="true">${emoji(c.icon)}</span>`;
 
 // --- pieces ---
 
@@ -79,7 +83,7 @@ export const catOf = (cats, id) => cats.get(id) ?? FALLBACK_CAT;
 function row(e, cats) {
   const c = catOf(cats, e.categoryId);
   return `<button class="row" type="button" data-id="${esc(e.id)}">
-    <span class="chip" style="background:${safeColor(c.color)}">${icon(c.icon)}</span>
+    ${chip(c)}
     <span class="mid"><span class="t1">${esc(e.note || c.name)}</span><span class="t2">${esc(c.name)} · ${esc(e.time)}</span></span>
     <span class="amt num">${formatNum(e.amount)}</span>
   </button>`;
