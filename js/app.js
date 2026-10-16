@@ -112,6 +112,15 @@ async function adoptSheetUrl() {
   await store.setMeta({ url: SHEET_URL });
 }
 
+// The "New expense" app shortcut opens #/add: land on home (replacing the hash, so back never
+// loops), then open the entry sheet.
+async function route() {
+  const add = location.hash === '#/add';
+  if (add) history.replaceState(null, '', '#/');
+  await render();
+  if (add) openEntry();
+}
+
 export async function boot() {
   state.ym = localISO().slice(0, 7);
   navigator.storage?.persist?.().catch(() => {});
@@ -125,7 +134,7 @@ export async function boot() {
   }
   await adoptSheetUrl().catch((e) => console.error(e));
   document.querySelector('.nav .p').addEventListener('click', () => openEntry());
-  addEventListener('hashchange', render);
+  addEventListener('hashchange', route);
   // Back from the background on a new day: refresh "Today" labels and the strip.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
@@ -136,6 +145,6 @@ export async function boot() {
   store.onChange(renderSoon);
   store.onChange(pushSoon);
   onInstallChange(renderSoon);
-  await render();
+  await route();
   pushNow();
 }

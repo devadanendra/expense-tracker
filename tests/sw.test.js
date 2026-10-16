@@ -20,3 +20,10 @@ test('every js module on disk is precached', () => {
 test('every SHELL entry exists on disk', () => {
   assert.deepEqual(shell.filter((p) => p !== './' && !existsSync(join(root, p))), []);
 });
+
+test('manifest: "New expense" shortcut opens #/add; every manifest icon is precached', () => {
+  const m = JSON.parse(readFileSync(join(root, 'manifest.webmanifest'), 'utf8'));
+  assert.equal(m.shortcuts[0].url, './#/add');
+  const icons = [...m.icons, ...m.shortcuts.flatMap((s) => s.icons)].map((i) => i.src);
+  assert.deepEqual(icons.filter((src) => !shell.includes(src)), []);
+});

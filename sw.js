@@ -9,6 +9,7 @@ const SHELL = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
+  'icons/shortcut-add-96.png',
   'js/app.js',
   'js/calc.js',
   'js/categories.js',
