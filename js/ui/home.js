@@ -34,6 +34,9 @@ export function dayLabel(iso, todayISO, withYear = false) {
   return `${day} ${MONTHS[m - 1].slice(0, 3)}${withYear ? ` ${y}` : ''}`;
 }
 
+// Entry sheet date row: '2026-10-16' -> '16 Oct 2026'.
+export const shortDate = (iso) => `${parts(iso)[2]} ${MONTHS[parts(iso)[1] - 1].slice(0, 3)} ${parts(iso)[0]}`;
+
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // A synced category color goes into style=""; anything but a hex color could smuggle extra CSS (url() beacons).

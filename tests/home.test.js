@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { localISO, shiftMonth, monthTitle, dayLabel } from '../js/ui/home.js';
+import { localISO, shiftMonth, monthTitle, dayLabel, shortDate } from '../js/ui/home.js';
 
 test('localISO uses local date fields, not UTC', () => {
   assert.equal(localISO(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
@@ -34,4 +34,9 @@ test('dayLabel: yesterday across month and year boundaries', () => {
 test('dayLabel: withYear adds the year to older days only', () => {
   assert.equal(dayLabel('2026-02-11', '2026-10-13', true), 'Wed 11 Feb 2026');
   assert.equal(dayLabel('2026-10-12', '2026-10-13', true), 'Yesterday · Mon 12');
+});
+
+test('shortDate: day, short month, year', () => {
+  assert.equal(shortDate('2026-10-16'), '16 Oct 2026');
+  assert.equal(shortDate('2027-01-05'), '5 Jan 2027');
 });

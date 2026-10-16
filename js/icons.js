@@ -8,6 +8,7 @@ const PATHS = {
   note: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   check: '<path d="m5 12 5 5L20 7"/>',
   back: '<path d="M20 12H8l4-4M8 12l4 4"/>',
+  backspace: '<path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7Z"/><path d="m12 9 6 6M18 9l-6 6"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
   'chevron-up': '<path d="m18 15-6-6-6 6"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
