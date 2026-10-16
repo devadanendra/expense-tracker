@@ -89,7 +89,7 @@ function row(e, cats) {
   const c = catOf(cats, e.categoryId);
   return `<button class="row" type="button" data-id="${esc(e.id)}">
     ${chip(c)}
-    <span class="mid"><span class="t1">${esc(e.note || c.name)}</span><span class="t2">${esc(c.name)} · ${esc(e.time)}</span></span>
+    <span class="mid"><span class="t1">${esc(e.note || c.name)}</span>${e.note ? `<span class="t2">${esc(c.name)}</span>` : ''}</span>
     <span class="amt num">${formatNum(e.amount)}</span>
   </button>`;
 }
