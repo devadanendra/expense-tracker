@@ -4,11 +4,13 @@ import { toCSV, fromCSV } from '../csv.js';
 import { mergeRecords } from '../merge.js';
 import { icon } from '../icons.js';
 import { canPrompt, isInstalled, promptInstall } from '../install.js';
-import { sync, render } from '../app.js';
+import { sync, syncNow, render } from '../app.js';
 import { esc, localISO } from './home.js';
 
 const NOT_SET_UP = 'Not set up — see SETUP.md';
 const UNREACHABLE = "Can't reach Google — will retry";
+const BAD_REPLY = 'Unexpected reply from the script — try redeploying';
+const REASONS = { offline: "You're offline — will retry", timeout: 'Google took too long — will retry', 'bad-reply': BAD_REPLY, script: BAD_REPLY };
 const PASS_HINT = 'Enter the passphrase you set in the Apps Script.';
 const FORM_ERRORS = { auth: 'Wrong passphrase', nourl: NOT_SET_UP }; // anything else: can't reach
 
@@ -27,12 +29,18 @@ function ago(ms) {
   return `${Math.floor(min / 1440)} d ago`;
 }
 
+// Why a push failed, from sync.js's error and detail: the sync row and its "Sync now" toast.
+function failReason(error, detail) {
+  if (error === 'auth') return 'Wrong passphrase';
+  const http = /^http (\d+)$/.exec(detail);
+  return http ? `Google returned an error (HTTP ${http[1]})` : REASONS[detail] ?? UNREACHABLE;
+}
+
 // Sync row subtitle, most urgent state first.
 export function syncStatus({ url, meta, pending, now }) {
   if (!url) return NOT_SET_UP;
   if (!meta.linked) return 'Not set up';
-  if (meta.lastError === 'auth') return 'Wrong passphrase';
-  if (meta.lastError) return UNREACHABLE;
+  if (meta.lastError) return failReason(meta.lastError, meta.lastErrorDetail);
   if (pending) return `${plural(pending, 'change')} waiting`;
   return `Synced ${ago(now - (meta.lastSyncAt ?? now))}`;
 }
@@ -261,6 +269,25 @@ function openInfo(title, text) {
   });
 }
 
+// Sync row "Sync now": the app's auto-push, so a success also lifts its retry mute.
+// syncing keeps the row on "Syncing…" (disabled) through the re-renders the push's writes cause.
+let syncing = false;
+async function syncRow() {
+  if (syncing) return;
+  syncing = true;
+  render();
+  let r;
+  try {
+    r = await syncNow();
+  } catch (e) {
+    console.error(e);
+    r = { ok: false, msg: `Couldn't sync: ${e.message ?? e}` };
+  }
+  syncing = false;
+  toast(r?.ok === false ? r.msg ?? failReason(r.error, r.detail) : 'Synced'); // no result: nothing was queued
+  render();
+}
+
 // Storage row: ask Chrome to keep the data (it says yes once the app is installed), else explain.
 async function protect() {
   let ok = false;
@@ -273,12 +300,12 @@ async function protect() {
 // --- view ---
 
 // One row: a button (act), a link (href), or inert text. Ids let render() keep focus on re-render.
-function row({ ico, title, sub = '', end = '', act, href }) {
+function row({ ico, title, sub = '', end = '', act, href, disabled }) {
   const inner = `<span class="ico">${icon(ico)}</span>
     <span class="mid"><span class="t1">${title}</span>${sub ? `<span class="t2">${sub}</span>` : ''}</span>
     <span class="v">${end}${act || href ? icon('chevron-right') : ''}</span>`;
   if (href) return `<a class="sr" id="st-${ico}" href="${href}">${inner}</a>`;
-  if (act) return `<button class="sr" id="st-${act}" type="button" data-act="${act}">${inner}</button>`;
+  if (act) return `<button class="sr" id="st-${act}" type="button" data-act="${act}"${disabled ? ' disabled' : ''}>${inner}</button>`;
   return `<div class="sr">${inner}</div>`;
 }
 
@@ -288,15 +315,17 @@ export async function renderSettings(root) {
     Promise.resolve(navigator.storage?.persisted?.()).catch(() => false),
     Promise.resolve(navigator.storage?.estimate?.()).catch(() => undefined),
   ]);
-  const status = syncStatus({ url: SHEET_URL, meta, pending: outbox.length, now: Date.now() });
+  const status = syncing ? 'Syncing…' : syncStatus({ url: SHEET_URL, meta, pending: outbox.length, now: Date.now() });
   const fixable = SHEET_URL && (!meta.linked || meta.lastError === 'auth');
   const on = SHEET_URL && meta.linked && !meta.lastError;
+  // Linked with a network/server error or changes waiting: a tap syncs now.
+  const tap = fixable ? 'connect' : SHEET_URL && meta.linked && (syncing || meta.lastError || outbox.length) && 'sync';
 
   root.innerHTML = `<header class="bar"><a class="ib" href="#/" aria-label="Back">${icon('back')}</a><h1>Settings</h1></header>
   <section class="set">
     <h2 class="sg">Data safety</h2>
     <div class="lst">
-      ${row({ ico: 'cloud', title: 'Google Sheet sync', sub: status, act: fixable && 'connect', end: on ? '<span class="dot"></span>On' : '' })}
+      ${row({ ico: 'cloud', title: 'Google Sheet sync', sub: status, act: tap, disabled: syncing, end: on ? '<span class="dot"></span>On' : '' })}
       ${row({ ico: 'shield', title: 'Storage', sub: storageLine(persisted, estimate?.usage), act: 'storage' })}
       ${row({ ico: 'back', title: 'Restore from Sheet', sub: SHEET_URL ? '' : NOT_SET_UP, act: SHEET_URL && 'restore' })}
     </div>
@@ -323,6 +352,7 @@ export async function renderSettings(root) {
     }
     switch (ev.target.closest('[data-act]')?.dataset.act) {
       case 'connect': return openPassphrase('connect');
+      case 'sync': return syncRow();
       case 'restore': return openPassphrase('restore');
       case 'import': return openImport();
       case 'storage': return protect();

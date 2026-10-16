@@ -16,6 +16,20 @@ test('syncStatus: setup and error states win over pending and synced', () => {
   assert.equal(status({ ...linked, lastError: 'server' }), "Can't reach Google — will retry");
 });
 
+test('syncStatus: network and server errors say why', () => {
+  const why = (lastError, lastErrorDetail) => status({ ...linked, lastError, lastErrorDetail }, 3);
+  assert.equal(why('network', 'offline'), "You're offline — will retry");
+  assert.equal(why('network', 'timeout'), 'Google took too long — will retry');
+  assert.equal(why('network', 'network'), "Can't reach Google — will retry");
+  assert.equal(why('server', 'http 500'), 'Google returned an error (HTTP 500)');
+  assert.equal(why('server', 'http 404'), 'Google returned an error (HTTP 404)');
+  assert.equal(why('server', 'bad-reply'), 'Unexpected reply from the script — try redeploying');
+  assert.equal(why('server', 'script'), 'Unexpected reply from the script — try redeploying');
+  assert.equal(why('server', 'something new'), "Can't reach Google — will retry");
+  assert.equal(why('server', null), "Can't reach Google — will retry");
+  assert.equal(why('auth', null), 'Wrong passphrase');
+});
+
 test('syncStatus: pending count, singular and plural', () => {
   assert.equal(status(linked, 1), '1 change waiting');
   assert.equal(status(linked, 3), '3 changes waiting');

@@ -27,21 +27,26 @@ export function startRestore() {
 
 // Push queued changes, only once linked (an unlinked device never pushes: link pull-merges first).
 // A failed push mutes store-change triggers (its own meta write is one) and retries in 60 s, so
-// offline never loops; going online or back to the app lifts the mute.
+// offline never loops; going online, back to the app or Settings' "Sync now" lifts the mute.
+// Resolves sync.push()'s result, or undefined when there is nothing to push.
 let pushTimer = 0;
 let mutedUntil = 0;
 async function autoPush() {
   clearTimeout(pushTimer);
   if (!SHEET_URL || !(await store.getMeta()).linked || !(await store.getOutbox()).length) return;
   const r = await sync.push();
-  if (r.ok) return;
+  if (r.ok) return r;
   mutedUntil = Date.now() + 60000;
   clearTimeout(pushTimer);
   pushTimer = setTimeout(pushNow, 60000);
+  return r;
+}
+export function syncNow() {
+  mutedUntil = 0;
+  return autoPush();
 }
 function pushNow() {
-  mutedUntil = 0;
-  autoPush().catch((e) => console.error(e));
+  syncNow().catch((e) => console.error(e));
 }
 function pushSoon() {
   if (Date.now() < mutedUntil) return;
