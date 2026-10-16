@@ -187,12 +187,12 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 @keyframes es-up { from { transform: translateY(100%); } }
 @keyframes es-fade { from { opacity: 0; } }
 
-/* Layout per the owner-picked board (Main.dc.html). The sheet is as tall as its content; on a
-   short screen the amount area gives up its padding first, then the middle scrolls, and the
-   keypad always stays whole. */
+/* Layout per the owner-picked board (Main.dc.html). The sheet is as tall as its content, leaving at
+   least 56px of scrim above it to tap; on a short screen the amount area gives up its padding
+   first, then the middle scrolls, and the keypad always stays whole. */
 .es .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(20, 18, 16, .38); animation: es-fade .2s ease-out; transition: opacity .2s ease-out; }
 .es .sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; max-width: 480px; max-height: calc(100% - 12px); margin: 0 auto;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; max-width: 480px; max-height: calc(100% - 56px); margin: 0 auto;
   display: flex; flex-direction: column; gap: 14px; overflow-y: auto; overscroll-behavior: contain;
   padding: 10px 24px calc(24px + env(safe-area-inset-bottom));
   background: var(--surf); border-radius: 24px 24px 0 0;
@@ -204,11 +204,12 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 /* Screen-reader / keyboard close (the scrim is pointer-only); shows only when focused. */
 .vh { position: absolute; top: 8px; right: 16px; z-index: 1; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .vh:focus-visible { width: auto; height: 36px; padding: 0 14px; clip-path: none; border-radius: 18px; background: var(--bg2); font-weight: 600; }
-.es-head, .es-amt { touch-action: none; } /* drag-to-close region */
+.es-head, .es-amt { touch-action: none; -webkit-user-select: none; user-select: none; } /* drag-to-close region */
 .es-head { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .es-head .grab { margin: 0 0 2px; }
 .es-head h2 { font-size: 18px; font-weight: 600; line-height: 22px; }
-.es .del { min-height: 0; margin-top: -10px; padding: 4px 10px; text-decoration: underline; text-underline-offset: 3px; }
+.es .del { position: relative; min-height: 0; margin-top: -10px; padding: 4px 10px; text-decoration: underline; text-underline-offset: 3px; }
+.es .del::after { content: ""; position: absolute; inset: -9px -6px; } /* 44px tap target, small look */
 .es .sheet > .es-amt { flex: 0 1000 158px; min-height: 96px; padding-top: 17px; display: flex; flex-direction: column; justify-content: center; }
 .amtIn { text-align: center; font-size: 52px; font-weight: 700; letter-spacing: -1px; line-height: 62px; overflow-wrap: anywhere; }
 .amtIn .rp { font-size: 20px; font-weight: 500; color: var(--mu); letter-spacing: 0; margin-right: 8px; }
@@ -255,7 +256,9 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .k.go svg { width: 28px; height: 28px; stroke-width: 2.2; }
 .k.go:disabled { opacity: .35; cursor: default; }
 @media (max-height: 780px) {
-  .pad { grid-auto-rows: 54px; }
+  .es .sheet, .es-head, .es .sheet > .es-mid { gap: 10px; }
+  .fld { height: 48px; }
+  .pad { grid-auto-rows: 52px; margin-top: 10px; } /* note-to-keypad gap stays 20px */
   .es .sheet > .es-amt { min-height: 79px; padding-top: 0; }
 }
 /* Category panel: a card over the dimmed sheet; tapping the dim closes it. */
