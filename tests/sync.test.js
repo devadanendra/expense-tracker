@@ -102,13 +102,14 @@ test('failed push keeps outbox', async () => {
   });
   const fetch = async () => { throw new TypeError('offline'); };
   const res = await mk(store, fetch).push();
-  assert.deepEqual(res, { ok: false, error: 'network' });
+  assert.deepEqual(res, { ok: false, error: 'network', detail: 'network' });
   assert.equal(store.box.size, 2);
   assert.equal(store.meta.lastError, 'network');
+  assert.equal(store.meta.lastErrorDetail, 'network');
   assert.equal(store.meta.lastSyncAt, null);
 });
 
-test('aborted (timed-out) request maps to network and keeps outbox; next push is not wedged', async () => {
+test('aborted (timed-out) request maps to network/timeout and keeps outbox; next push is not wedged', async () => {
   const store = fakeStore({
     meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
   });
@@ -118,7 +119,7 @@ test('aborted (timed-out) request maps to network and keeps outbox; next push is
     return reply({ ok: true });
   };
   const sync = mk(store, fetch);
-  assert.deepEqual(await sync.push(), { ok: false, error: 'network' });
+  assert.deepEqual(await sync.push(), { ok: false, error: 'network', detail: 'timeout' });
   assert.equal(store.box.size, 1);
   hang = false;
   assert.deepEqual(await sync.push(), { ok: true, pushed: 1 });
@@ -150,27 +151,87 @@ test('next push resends everything a failed push left behind', async () => {
   assert.equal(store.box.size, 0);
 });
 
-for (const [name, handler, want] of [
-  ['HTTP 500', () => reply({ ok: true }, 500), 'server'],
-  ['unparseable JSON', () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } }), 'server'],
-  ['ok:false auth', () => ({ ok: false, error: 'auth' }), 'auth'],
-  ['ok:false other', () => ({ ok: false, error: 'boom' }), 'server'],
-  ['ok:false no error', () => ({ ok: false }), 'server'],
+for (const [name, handler, want, detail] of [
+  ['fetch rejected', () => { throw new TypeError('Failed to fetch'); }, 'network', 'network'],
+  ['timeout', () => { throw new DOMException('The operation timed out.', 'TimeoutError'); }, 'network', 'timeout'],
+  ['abort', () => { throw new DOMException('The operation was aborted.', 'AbortError'); }, 'network', 'timeout'],
+  ['HTTP 500', () => reply({ ok: true }, 500), 'server', 'http 500'],
+  ['HTTP 404', () => reply({}, 404), 'server', 'http 404'],
+  ['unparseable JSON', () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } }), 'server', 'bad-reply'],
+  ['ok:false auth', () => ({ ok: false, error: 'auth' }), 'auth', undefined],
+  ['ok:false other', () => ({ ok: false, error: 'boom' }), 'server', 'script'],
+  ['ok:false no error', () => ({ ok: false }), 'server', 'script'],
 ]) {
-  test(`push error mapping: ${name} -> ${want}, outbox kept, lastError set`, async () => {
+  test(`push error mapping: ${name} -> ${want}/${detail}, outbox kept, lastError and detail set`, async () => {
     const store = fakeStore({
       meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
     });
     const res = await mk(store, fakeFetch(handler)).push();
-    assert.deepEqual(res, { ok: false, error: want });
+    assert.deepEqual(res, detail ? { ok: false, error: want, detail } : { ok: false, error: want });
     assert.equal(store.box.size, 1);
     assert.equal(store.meta.lastError, want);
+    assert.equal(store.meta.lastErrorDetail, detail ?? null);
   });
 }
 
+test('push error mapping: fetch rejected while the browser is offline -> network/offline', async (t) => {
+  Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+  t.after(() => { delete navigator.onLine; });
+  const store = fakeStore({
+    meta: linkedMeta, expenses: [exp('a', 1)], outbox: [{ kind: 'expense', id: 'a' }],
+  });
+  const res = await mk(store, async () => { throw new TypeError('Failed to fetch'); }).push();
+  assert.deepEqual(res, { ok: false, error: 'network', detail: 'offline' });
+  assert.equal(store.meta.lastErrorDetail, 'offline');
+});
+
+// n records: the first nc are categories, queued after the expenses to check categories go first.
+function bigStore(n, nc = 0) {
+  const expenses = Array.from({ length: n - nc }, (_, i) => exp(`e${i}`, 1));
+  const categories = Array.from({ length: nc }, (_, i) => cat(`c${i}`, 1));
+  const outbox = [...expenses.map((r) => ({ kind: 'expense', id: r.id })), ...categories.map((r) => ({ kind: 'category', id: r.id }))];
+  return fakeStore({ meta: linkedMeta, expenses, categories, outbox });
+}
+const sizes = (fetch) => fetch.calls.map((c) => c.body.expenses.length + c.body.categories.length);
+
+test('push sends 200 records per request, categories first, clearing each chunk as it lands', async () => {
+  const store = bigStore(450, 30);
+  const left = [];
+  const fetch = fakeFetch(() => { left.push(store.box.size); return { ok: true }; });
+  const res = await mk(store, fetch).push();
+  assert.deepEqual(res, { ok: true, pushed: 450 });
+  assert.deepEqual(sizes(fetch), [200, 200, 50]);
+  assert.equal(fetch.calls[0].body.categories.length, 30);
+  assert.ok(fetch.calls.slice(1).every((c) => c.body.categories.length === 0));
+  assert.ok(fetch.calls.every((c) => c.body.op === 'upsert' && c.body.pass === PASS));
+  assert.deepEqual(left, [450, 250, 50], 'each chunk cleared before the next is sent');
+  assert.equal(store.box.size, 0);
+  assert.equal(store.meta.lastError, null);
+});
+
+test('push stops at the first failed chunk: earlier chunks stay cleared, the rest stay queued', async () => {
+  const store = bigStore(450);
+  const fetch = fakeFetch(() => (fetch.calls.length === 2 ? reply({}, 500) : { ok: true }));
+  const res = await mk(store, fetch).push();
+  assert.deepEqual(res, { ok: false, error: 'server', detail: 'http 500' });
+  assert.deepEqual(sizes(fetch), [200, 200]);
+  assert.equal(store.box.size, 250);
+  const sent1 = fetch.calls[0].body.expenses.map((e) => `expense:${e.id}`);
+  assert.ok(sent1.every((k) => !store.box.has(k)), 'chunk 1 cleared');
+  assert.equal(store.meta.lastError, 'server');
+  assert.equal(store.meta.lastErrorDetail, 'http 500');
+  assert.ok(store.meta.lastSyncAt > 0, 'chunk 1 recorded its sync time');
+
+  const again = await mk(store, fakeFetch(() => ({ ok: true }))).push();
+  assert.deepEqual(again, { ok: true, pushed: 250 });
+  assert.equal(store.box.size, 0);
+  assert.equal(store.meta.lastError, null);
+  assert.equal(store.meta.lastErrorDetail, null);
+});
+
 test('successful push sends one upsert, clears sent entries, records sync time', async () => {
   const store = fakeStore({
-    meta: { ...linkedMeta, lastError: 'network' },
+    meta: { ...linkedMeta, lastError: 'network', lastErrorDetail: 'timeout' },
     expenses: [exp('a', 1), exp('b', 2)], categories: [cat('c1', 3)],
     outbox: [{ kind: 'expense', id: 'a' }, { kind: 'category', id: 'c1' }],
   });
@@ -187,6 +248,7 @@ test('successful push sends one upsert, clears sent entries, records sync time',
   assert.deepEqual(body, { op: 'upsert', pass: PASS, expenses: [exp('a', 1)], categories: [cat('c1', 3)] });
   assert.equal(store.box.size, 0);
   assert.equal(store.meta.lastError, null);
+  assert.equal(store.meta.lastErrorDetail, null);
   assert.ok(store.meta.lastSyncAt >= before);
 });
 
@@ -293,16 +355,16 @@ test('auth error does not link', async () => {
   assert.equal(fetch.calls[0].body.op, 'pull');
 });
 
-for (const [name, handler, want] of [
-  ['network', () => { throw new TypeError('offline'); }, 'network'],
-  ['HTTP 500', () => reply({}, 500), 'server'],
-  ['ok:false other', () => ({ ok: false, error: 'x' }), 'server'],
-  ['malformed pull body', () => ({ ok: true }), 'server'],
+for (const [name, handler, want, detail] of [
+  ['network', () => { throw new TypeError('offline'); }, 'network', 'network'],
+  ['HTTP 500', () => reply({}, 500), 'server', 'http 500'],
+  ['ok:false other', () => ({ ok: false, error: 'x' }), 'server', 'script'],
+  ['malformed pull body', () => ({ ok: true }), 'server', 'bad-reply'],
 ]) {
   test(`link pull error (${name}) returns ${want} and stores nothing`, async () => {
     const store = fakeStore({ expenses: [exp('a', 1)] });
     const res = await mk(store, fakeFetch(handler)).link(PASS);
-    assert.deepEqual(res, { ok: false, error: want });
+    assert.deepEqual(res, { ok: false, error: want, detail });
     assert.equal(store.meta.passphrase, null);
     assert.equal(store.meta.linked, false);
     assert.equal(store.putManyCalls.length, 0);
@@ -424,6 +486,7 @@ test('remoteCount returns the Sheet expense count', async () => {
 test('remoteCount maps network and server errors', async () => {
   const store = fakeStore();
   const down = async () => { throw new TypeError('offline'); };
-  assert.deepEqual(await mk(store, down).remoteCount(PASS), { ok: false, error: 'network' });
-  assert.deepEqual(await mk(store, fakeFetch(() => reply({}, 502))).remoteCount(PASS), { ok: false, error: 'server' });
+  assert.deepEqual(await mk(store, down).remoteCount(PASS), { ok: false, error: 'network', detail: 'network' });
+  assert.deepEqual(await mk(store, fakeFetch(() => reply({}, 502))).remoteCount(PASS), { ok: false, error: 'server', detail: 'http 502' });
+  assert.deepEqual(await mk(store, fakeFetch(() => ({ ok: true }))).remoteCount(PASS), { ok: false, error: 'server', detail: 'bad-reply' });
 });
