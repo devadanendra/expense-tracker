@@ -50,6 +50,8 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   let busy = false;
   let closed = false;
   const opener = document.activeElement;
+  // Marks this open's history entries: a {sheet} entry left by a reload or tab restore is not ours.
+  const tok = Date.now();
   const behind = [document.getElementById('app'), document.querySelector('.nav')];
 
   const root = document.createElement('div');
@@ -175,11 +177,11 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   }
   function openPanel() {
     showPanel(true);
-    history.pushState({ sheet: 1, panel: 1 }, '');
+    history.pushState({ sheet: tok, panel: 1 }, '');
   }
   function closePanel() {
     showPanel(false);
-    if (history.state?.panel) history.back();
+    if (history.state?.sheet === tok && history.state.panel) history.back();
   }
 
   function close(fromPopstate) {
@@ -190,12 +192,12 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     removeEventListener('popstate', onPop);
     document.removeEventListener('keydown', onKey);
     for (const el of behind) el.inert = false;
-    if (!fromPopstate && history.state?.sheet) history.go(history.state.panel ? -2 : -1);
+    if (!fromPopstate && history.state?.sheet === tok) history.go(history.state.panel ? -2 : -1);
     if (opener?.isConnected) opener.focus();
   }
 
   // Back from the panel's entry lands on the sheet's own: only the panel closes.
-  const onPop = () => (history.state?.sheet ? showPanel(false) : close(true));
+  const onPop = () => (history.state?.sheet === tok ? showPanel(false) : close(true));
 
   function onKey(e) {
     if (e.target === note || e.target === picker || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -260,20 +262,21 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     scrim.style.opacity = dy ? Math.max(0, 1 - dy / sheet.offsetHeight) : '';
   }
   sheet.addEventListener('pointerdown', (e) => {
-    if (busy || !e.isPrimary || e.button > 0 || !e.target.closest('.es-head, .es-amt') || e.target.closest('button')) return;
-    drag = { y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
+    if (drag || busy || !e.isPrimary || e.button > 0 || !e.target.closest('.es-head, .es-amt') || e.target.closest('button')) return;
+    drag = { id: e.pointerId, y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
     sheet.setPointerCapture(e.pointerId);
     root.classList.add('drag');
   });
+  // Only the dragging pointer counts: a second finger tapping a key must not end the drag.
   sheet.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.id) return;
     if (e.timeStamp > drag.t) drag.v = (e.clientY - drag.y) / (e.timeStamp - drag.t);
     drag.y = e.clientY;
     drag.t = e.timeStamp;
     follow(Math.max(0, e.clientY - drag.y0));
   });
   function release(e) {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.id) return;
     const dy = Math.max(0, e.clientY - drag.y0);
     // A fling needs a recent fast move and some distance, so a tap's jitter never closes.
     const fling = drag.v > FLING && e.timeStamp - drag.t < 100 && dy > 16;
@@ -293,7 +296,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   isOpen = true;
   document.body.append(root);
   for (const el of behind) el.inert = true;
-  history.pushState({ sheet: 1 }, '');
+  history.pushState({ sheet: tok }, '');
   addEventListener('popstate', onPop);
   document.addEventListener('keydown', onKey);
   reveal();
