@@ -273,6 +273,15 @@ test('empty outbox while linked: ok, pushed 0, no request', async () => {
   assert.equal(fetch.calls.length, 0);
 });
 
+test('empty outbox clears a stale error, no request', async () => {
+  const fetch = fakeFetch(() => ({ ok: true }));
+  const store = fakeStore({ meta: { ...linkedMeta, lastError: 'network', lastErrorDetail: 'timeout' } });
+  assert.deepEqual(await mk(store, fetch).push(), { ok: true, pushed: 0 });
+  assert.equal(fetch.calls.length, 0);
+  assert.equal((await store.getMeta()).lastError, null);
+  assert.equal((await store.getMeta()).lastErrorDetail, null);
+});
+
 test('record re-edited during push stays in the outbox and is resent next time', async () => {
   const store = fakeStore({
     meta: linkedMeta, expenses: [exp('a', 1), exp('b', 1)],

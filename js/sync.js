@@ -52,6 +52,8 @@ export function createSync({ url, fetch, store }) {
       sent.push([{ kind: entry.kind, id: entry.id, updatedAt: rec.updatedAt }, rec]);
     }
     if (gone.length) await store.clearOutbox(gone);
+    // Nothing left to send: an error saved by an earlier attempt no longer applies.
+    if (!sent.length && meta.lastError) await store.setMeta({ lastError: null, lastErrorDetail: null });
 
     // Categories first (stable sort), so the Sheet never holds an expense before its category.
     // Chunks go one at a time; a failed one stops the push and leaves it and the rest queued.
