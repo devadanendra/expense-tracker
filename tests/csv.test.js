@@ -223,6 +223,16 @@ test('unterminated quote rejects the file instead of eating rows', () => {
   assert.deepEqual(r.errors, ['Malformed CSV: unterminated quote']);
 });
 
+test('round-trip: formula-leading notes and category names come back unchanged', () => {
+  const notes = ['-', '=1+1', '+62 812', '@home', "'90s", "'=kept", "''-two", '\tTab'];
+  const custom = [...cats, { id: 'cat-dash', name: '-Misc', icon: 'dots', color: '#8a8178', order: 12, updatedAt: 1, deleted: false }];
+  const src = notes.map((note, i) => exp(`id-${i}`, { note, time: `0${i}:00`, categoryId: i ? 'cat-food' : 'cat-dash' }));
+  const { expenses, newCategories, errors } = fromCSV(toCSV(src, custom), custom, NOW);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(newCategories, []);
+  assert.deepEqual(expenses.map((e) => [e.note, e.categoryId]), src.map((e) => [e.note, e.categoryId]));
+});
+
 test('toCSV defuses formula-leading fields', () => {
   const e = { id: 'a', date: '2026-01-01', time: '10:00', amount: 5, categoryId: 'x', note: '=HYPERLINK("x")', deleted: false };
   const out = toCSV([e], [{ id: 'x', name: '@evil' }]);

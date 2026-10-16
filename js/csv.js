@@ -6,7 +6,9 @@ const NOT_OURS = 'Not an Expense Tracker CSV';
 
 const sortKey = (e) => `${e.date} ${e.time}`;
 // A leading = + - @ (or tab/CR) would run as a formula in Excel/Sheets: prefix ' to keep it text.
-const defuse = (s) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
+// Values already starting with ' before such a char get one more, so fromCSV can strip exactly one.
+const defuse = (s) => (/^'*[=+\-@\t\r]/.test(s) ? `'${s}` : s);
+const undefuse = (s) => (/^'+[=+\-@\t\r]/.test(s) ? s.slice(1) : s);
 const quote = (s) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
 export function toCSV(expenses, categories) {
@@ -97,7 +99,7 @@ export function fromCSV(text, categories, now) {
     if (i === 0 || (r.length === 1 && r[0].trim() === '')) return;
     const bad = (why) => errors.push(`Row ${i + 1}: ${why}`);
     if (r.length !== header.length) return bad('wrong number of columns');
-    const get = (c) => r[col[c]].trim();
+    const get = (c) => undefuse(r[col[c]].trim());
     const date = get('date');
     const time = get('time') || '12:00';
     const rawAmount = get('amount');
@@ -109,7 +111,7 @@ export function fromCSV(text, categories, now) {
     if (seen.has(id)) return bad('duplicate id');
     seen.add(id);
     expenses.push({
-      id, amount, categoryId: categoryFor(get('category')), date, time, note: r[col.note],
+      id, amount, categoryId: categoryFor(get('category')), date, time, note: undefuse(r[col.note]),
       createdAt: now, updatedAt: 0, deleted: false,
     });
   });
