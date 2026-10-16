@@ -291,14 +291,14 @@ export async function renderSettings(root) {
     <div class="lst">
       ${row({ ico: 'tag', title: 'Categories', end: cats.length, href: '#/categories' })}
       ${row({ ico: 'theme', title: 'Appearance', end: `<span class="seg ap" role="group" aria-label="Appearance">${Object.entries(THEMES).map(([k, label]) =>
-        `<button id="ap-${k}" type="button" data-ap="${k}" aria-pressed="${k === getTheme()}">${label}</button>`).join('')}</span>` })}
+        `<button id="ap-${k}" type="button" data-ap="${k}" aria-pressed="${k === (globalThis.getTheme?.() ?? 'system')}">${label}</button>`).join('')}</span>` })}
     </div>
   </section>`;
 
   root.addEventListener('click', (ev) => {
     const ap = ev.target.closest('[data-ap]');
     if (ap) {
-      setTheme(ap.dataset.ap); // js/theme.js (a classic script, so a global)
+      globalThis.setTheme?.(ap.dataset.ap); // js/theme.js, a classic script; missing, Settings still renders
       for (const b of root.querySelectorAll('[data-ap]')) b.setAttribute('aria-pressed', b === ap);
       return;
     }
