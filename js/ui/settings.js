@@ -11,6 +11,8 @@ const UNREACHABLE = "Can't reach Google — will retry";
 const PASS_HINT = 'Enter the passphrase you set in the Apps Script.';
 const FORM_ERRORS = { auth: 'Wrong passphrase', nourl: NOT_SET_UP }; // anything else: can't reach
 
+const THEMES = { system: 'System', light: 'Light', dark: 'Dark' };
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function ago(ms) {
@@ -262,10 +264,20 @@ export async function renderSettings(root) {
       ${row({ ico: 'upload', title: 'Import CSV', act: 'import' })}
     </div>
     <h2 class="sg">General</h2>
-    <div class="lst">${row({ ico: 'tag', title: 'Categories', end: cats.length, href: '#/categories' })}</div>
+    <div class="lst">
+      ${row({ ico: 'tag', title: 'Categories', end: cats.length, href: '#/categories' })}
+      ${row({ ico: 'theme', title: 'Appearance', end: `<span class="seg ap" role="group" aria-label="Appearance">${Object.entries(THEMES).map(([k, label]) =>
+        `<button id="ap-${k}" type="button" data-ap="${k}" aria-pressed="${k === getTheme()}">${label}</button>`).join('')}</span>` })}
+    </div>
   </section>`;
 
   root.addEventListener('click', (ev) => {
+    const ap = ev.target.closest('[data-ap]');
+    if (ap) {
+      setTheme(ap.dataset.ap); // js/theme.js (a classic script, so a global)
+      for (const b of root.querySelectorAll('[data-ap]')) b.setAttribute('aria-pressed', b === ap);
+      return;
+    }
     switch (ev.target.closest('[data-act]')?.dataset.act) {
       case 'connect': return openPassphrase('connect');
       case 'restore': return openPassphrase('restore');

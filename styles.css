@@ -17,8 +17,28 @@
   --sh1: 0 1px 2px rgba(28, 25, 23, .05), 0 2px 8px rgba(28, 25, 23, .04);
   --sh2: 0 8px 24px rgba(28, 25, 23, .16);
 }
+/* Dark: forced by Settings › Appearance (js/theme.js), or following the system unless forced light. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --hd: #26221e;
+  --bg2: #141210;
+  --surf: #1f1c19;
+  --tx: #f5f3ef;
+  --mu: #a8a29e;
+  --line: #2e2a26;
+  --ib: rgba(255, 255, 255, .08);
+  --bar: #4a443e;
+  --barF: #35302b;
+  --nav: rgba(40, 36, 32, .94);
+  --ac: #8b97ff;
+  --onAc: #141210;
+  --good: #7fc4a0;
+  --sh1: none;
+  --sh2: 0 8px 24px rgba(0, 0, 0, .5);
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --hd: #26221e;
     --bg2: #141210;
     --surf: #1f1c19;
@@ -279,6 +299,8 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 .ico svg { width: 15px; height: 15px; }
 .set .v { flex-shrink: 0; display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mu); }
 .set .v svg { width: 16px; height: 16px; }
+.ap { margin-top: 0; }
+.ap button { flex: none; padding: 0 10px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
 
 /* Settings sheets (passphrase, export, import) reuse the category editor dialog. */
