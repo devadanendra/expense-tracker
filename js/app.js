@@ -1,3 +1,4 @@
+import { onInstallChange } from './install.js';
 import * as store from './store.js';
 import { SHEET_URL } from './config.js';
 import { createSync } from './sync.js';
@@ -134,6 +135,7 @@ export async function boot() {
   addEventListener('online', pushNow);
   store.onChange(renderSoon);
   store.onChange(pushSoon);
+  onInstallChange(renderSoon);
   await render();
   pushNow();
 }

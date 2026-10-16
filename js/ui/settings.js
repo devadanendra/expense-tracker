@@ -3,6 +3,7 @@ import { SHEET_URL } from '../config.js';
 import { toCSV, fromCSV } from '../csv.js';
 import { mergeRecords } from '../merge.js';
 import { icon } from '../icons.js';
+import { canPrompt, isInstalled, promptInstall } from '../install.js';
 import { sync, render } from '../app.js';
 import { esc, localISO } from './home.js';
 
@@ -13,6 +14,7 @@ const FORM_ERRORS = { auth: 'Wrong passphrase', nourl: NOT_SET_UP }; // anything
 
 const PROTECT_HINT = "Chrome protects this app's data once it's installed. Open Chrome's ⋮ menu › Add to Home screen"
   + ' (or Install app), then open the app from your home screen. Keep Sheet sync or a CSV export as a backup.';
+const INSTALL_HINT = 'In Chrome, tap ⋮ (top right) › Add to Home screen or Install app. Then open Expenses from your home screen.';
 const THEMES = { system: 'System', light: 'Light', dark: 'Dark' };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -239,15 +241,31 @@ function openImport() {
   });
 }
 
+// Chrome's install dialog (home card, Settings row, info sheet). Needs the tap's user activation.
+export async function install() {
+  if ((await promptInstall()) === 'accepted') toast('Installing…');
+}
+
+// Info sheet with OK, plus an Install button when Chrome offers the prompt.
+function openInfo(title, text) {
+  const can = canPrompt();
+  const dlg = openSheet(title, `<p class="ce-txt">${text}</p>
+    <div class="btns">
+      ${can ? '<button class="btn primary" type="button" data-act="install">Install app</button>' : ''}
+      <button class="btn${can ? '' : ' primary'}" type="button" data-act="close">OK</button>
+    </div>`);
+  dlg.addEventListener('click', (ev) => {
+    if (!ev.target.closest('[data-act=install]')) return;
+    dlg.close();
+    install();
+  });
+}
+
 // Storage row: ask Chrome to keep the data (it says yes once the app is installed), else explain.
 async function protect() {
   let ok = false;
   try { ok = await navigator.storage.persist(); } catch { /* no Storage API: same advice */ }
-  if (!ok) {
-    openSheet('Protect your data', `<p class="ce-txt">${PROTECT_HINT}</p>
-      <div class="btns"><button class="btn primary" type="button" data-act="close">OK</button></div>`);
-    return;
-  }
+  if (!ok) return openInfo('Protect your data', PROTECT_HINT);
   toast('Storage protected');
   render();
 }
@@ -289,6 +307,7 @@ export async function renderSettings(root) {
     </div>
     <h2 class="sg">General</h2>
     <div class="lst">
+      ${isInstalled() ? '' : row({ ico: 'phone', title: 'Install app', sub: 'Add to your home screen', act: 'install' })}
       ${row({ ico: 'tag', title: 'Categories', end: cats.length, href: '#/categories' })}
       ${row({ ico: 'theme', title: 'Appearance', end: `<span class="seg ap" role="group" aria-label="Appearance">${Object.entries(THEMES).map(([k, label]) =>
         `<button id="ap-${k}" type="button" data-ap="${k}" aria-pressed="${k === (globalThis.getTheme?.() ?? 'system')}">${label}</button>`).join('')}</span>` })}
@@ -307,6 +326,7 @@ export async function renderSettings(root) {
       case 'restore': return openPassphrase('restore');
       case 'import': return openImport();
       case 'storage': return protect();
+      case 'install': return canPrompt() ? install() : openInfo('Install the app', INSTALL_HINT);
       case 'export': return openExport().catch((e) => { console.error(e); toast(`Couldn't export: ${e.message ?? e}`); });
     }
   });

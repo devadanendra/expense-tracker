@@ -5,6 +5,8 @@ import { DEFAULT_CATEGORIES, OTHER_ID, emoji } from '../categories.js';
 import { icon } from '../icons.js';
 import { SHEET_URL } from '../config.js';
 import { openEntry, startRestore, render } from '../app.js';
+import { installCardVisible, dismissInstallCard } from '../install.js';
+import { install } from './settings.js';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'];
@@ -102,6 +104,15 @@ const restoreCard = () => `<div class="card restore">
     </div>
   </div>`;
 
+const installCard = () => `<div class="card install">
+    <h2>Install Expense Tracker</h2>
+    <p>One tap from your home screen, and your data stays protected.</p>
+    <div class="btns">
+      <button class="btn primary" type="button" data-act="install">Install</button>
+      <button class="btn" type="button" data-act="later">Not now</button>
+    </div>
+  </div>`;
+
 // Expenses grouped by day, newest first, as home lists them. label(date) names each day.
 export const dayGroups = (expenses, cats, label) => byDay(expenses).map((g) => `<h2 class="dh"><span>${label(g.date)}</span><span class="num">${formatRp(g.total)}</span></h2>
       <div class="lst">${g.items.map((e) => row(e, cats)).join('')}</div>`).join('');
@@ -163,8 +174,10 @@ export async function renderHome(root, state) {
   const cats = new Map(categories.map((c) => [c.id, c]));
 
   // Shown until linked, even with entries: the only sign on home that backup is paused.
-  const card = SHEET_URL && !meta.linked && !state.restoreDismissed ? restoreCard() : '';
-  const body = month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : card || emptyMonth();
+  const restore = SHEET_URL && !meta.linked && !state.restoreDismissed ? restoreCard() : '';
+  const nudge = !restore && installCardVisible() ? installCard() : ''; // the restore card wins
+  const card = restore || nudge;
+  const body = month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : restore || nudge + emptyMonth();
 
   root.innerHTML = `<header class="hd">
     ${monthHeader(ym, total(month), `<div class="acts">
@@ -184,6 +197,8 @@ export async function renderHome(root, state) {
     switch (el.dataset.act) {
       case 'restore': return startRestore();
       case 'fresh': state.restoreDismissed = true; return render();
+      case 'install': return install();
+      case 'later': dismissInstallCard(); return render();
     }
   });
 }
