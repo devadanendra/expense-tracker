@@ -67,7 +67,8 @@ export function planImport(text, local, categories, now) {
 let toastEl;
 let toastTimer;
 // One polite live region. It moves into an open modal <dialog>, since the page behind one is inert.
-export function toast(msg) {
+// action ({ label, run }) adds a button, such as Undo, that clears the toast when tapped.
+export function toast(msg, action) {
   if (!toastEl) {
     toastEl = document.createElement('p');
     toastEl.className = 'toast';
@@ -76,6 +77,16 @@ export function toast(msg) {
   }
   (document.querySelector('dialog[open]') ?? document.body).append(toastEl);
   toastEl.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = action.label;
+    b.addEventListener('click', () => {
+      toastEl.textContent = '';
+      action.run();
+    }, { once: true });
+    toastEl.append(b);
+  }
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toastEl.textContent = ''; }, 4000);
 }

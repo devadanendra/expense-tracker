@@ -70,3 +70,23 @@ export function compareToLastMonth(expenses, todayISO) {
   );
   return { diff: upTo(ym, d) - upTo(prev, Math.min(d, daysInMonth(prev))) };
 }
+
+// Expenses worth re-adding with one tap: each amount + category + note (case and spaces ignored)
+// entered more than once, most repeated first, then most recent. Keeps the latest note's spelling.
+export function quickPicks(expenses, n = 8) {
+  const groups = new Map();
+  for (const e of live(expenses)) {
+    const note = (e.note ?? '').trim();
+    const k = `${e.amount}|${e.categoryId}|${note.toLowerCase()}`;
+    const at = `${e.date} ${e.time}`;
+    const g = groups.get(k) ?? { count: 0, at: '', pick: null };
+    g.count++;
+    if (at >= g.at) Object.assign(g, { at, pick: { amount: e.amount, categoryId: e.categoryId, note } });
+    groups.set(k, g);
+  }
+  return [...groups.values()]
+    .filter((g) => g.count > 1)
+    .sort((a, b) => b.count - a.count || b.at.localeCompare(a.at))
+    .slice(0, n)
+    .map((g) => ({ ...g.pick, count: g.count }));
+}

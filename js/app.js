@@ -4,6 +4,7 @@ import { SHEET_URL } from './config.js';
 import { createSync } from './sync.js';
 import { renderHome, localISO } from './ui/home.js';
 import { openEntrySheet } from './ui/entry-sheet.js';
+import { openFrequent } from './ui/frequent.js';
 import { renderReports } from './ui/reports.js';
 import { renderSearch } from './ui/search.js';
 import { renderCategories } from './ui/categories.js';
@@ -173,7 +174,43 @@ export async function boot() {
     return;
   }
   await adoptSheetUrl().catch((e) => console.error(e));
-  document.querySelector('.nav .p').addEventListener('click', () => openEntry());
+  // Tap + for the entry sheet; hold it (or the menu key) for the Frequent arc, which follows the
+  // still-held finger. A ring fills while holding (.holding). The tap that ends a hold only
+  // releases it.
+  const plus = document.querySelector('.nav .p');
+  let holdTimer = 0;
+  let held = false;
+  let downId;
+  const hold = () => {
+    clearTimeout(holdTimer);
+    plus.classList.remove('holding');
+    held = true;
+    navigator.vibrate?.(10);
+    openFrequent({ plus, pointerId: downId }).catch((e) => console.error(e));
+  };
+  plus.addEventListener('pointerdown', (e) => {
+    held = false;
+    downId = undefined;
+    if (e.button > 0) return;
+    downId = e.pointerId;
+    plus.classList.add('holding');
+    holdTimer = setTimeout(hold, 450);
+  });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) {
+    plus.addEventListener(t, () => {
+      clearTimeout(holdTimer);
+      plus.classList.remove('holding');
+      if (t !== 'pointerleave') downId = undefined;
+    });
+  }
+  plus.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!held) hold();
+  });
+  plus.addEventListener('click', () => {
+    if (held) held = false;
+    else openEntry();
+  });
   // Links, tapped or Enter-activated (both fire click). Back/forward still render via hashchange.
   document.addEventListener('click', (ev) => {
     const a = ev.target.closest('a[href^="#/"]');

@@ -162,6 +162,26 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 .nav .t[aria-current] { background: var(--bg2); color: var(--tx); }
 .nav .p { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ac); color: var(--onAc); }
 .nav .p svg { width: 22px; height: 22px; stroke-width: 2.2; }
+.nav .p { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* hold opens Frequent, not the OS menu */
+
+/* Frequent: hold + and repeated expenses fan out in an arc over it (js/ui/frequent.js). */
+.nav .p { touch-action: none; transition: box-shadow .45s linear; }
+.nav .p.holding { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ac) 30%, transparent); }
+.fq-dim { position: fixed; inset: 0; z-index: 11; background: rgba(20, 18, 16, .45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: es-fade .15s ease-out; }
+.fq-tip {
+  position: fixed; left: 50%; z-index: 12; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 16px;
+  background: var(--surf); color: var(--tx); box-shadow: var(--sh2); font-size: 15px; font-weight: 600; text-align: center; animation: es-fade .2s ease-out;
+}
+.fq-tip .num { margin-left: 8px; color: var(--mu); font-weight: 500; }
+.fq-it, .fq-x { position: fixed; z-index: 12; transform: translate(-50%, -50%); }
+.fq-it { display: flex; flex-direction: column; align-items: center; gap: 4px; animation: fq-pop .26s cubic-bezier(.3, 1.4, .5, 1) var(--d) both; }
+@keyframes fq-pop { from { opacity: 0; transform: translate(-50%, -50%) translateY(60px) scale(.4); } }
+.fq-it .chip { --s: 56px; background: color-mix(in srgb, var(--c) 22%, var(--surf)); box-shadow: var(--sh2); transition: transform .12s ease-out, box-shadow .12s; }
+.fq-it.on .chip, .fq-it:focus-visible .chip { transform: scale(1.2); box-shadow: 0 0 0 3px var(--surf), 0 0 0 6px var(--ac), var(--sh2); }
+.fq-it .num { font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); transition: transform .12s ease-out; }
+.fq-it.on .num, .fq-it:focus-visible .num { transform: translateY(6px); }
+.fq-x { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ac); color: var(--onAc); }
+.fq-x svg { width: 22px; height: 22px; stroke-width: 2.2; transform: rotate(45deg); }
 
 /* ---------- Simple screens (title bar) ---------- */
 .bar { display: flex; align-items: center; gap: 6px; padding: 14px 14px 0; }
@@ -367,6 +387,7 @@ textarea.note { height: auto; padding: 10px 14px; resize: vertical; font-size: 1
   font-size: 13px; font-weight: 600; text-align: center; pointer-events: none;
 }
 .toast:empty { opacity: 0; }
+.toast button { pointer-events: auto; margin: -10px -8px -10px 12px; padding: 10px 8px; font: inherit; font-weight: 700; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 dialog .toast { top: 16px; bottom: auto; } /* above a bottom sheet, not over its buttons */
 
 /* ---------- Page change (js/app.js render) ---------- */
