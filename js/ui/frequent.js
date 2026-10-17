@@ -57,7 +57,8 @@ export async function openFrequent({ plus, pointerId }) {
   const today = localISO();
   const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return localISO(d); })();
   const weekday = (iso) => { const d = new Date(`${iso}T12:00`); return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${d.getDate()}`; };
-  const when = (iso, name, ic) => `<button type="button" role="menuitem" data-when="${iso}">${name}<span class="r">${weekday(iso)}</span>${icon(ic)}</button>`;
+  const when = (iso, name, ic, day = weekday(iso)) => `<button type="button" role="menuitem" data-when="${iso}">
+    <span class="ic">${icon(ic)}</span><span class="t1">${name}</span>${day ? `<span class="t2">${day}</span>` : ''}</button>`;
   const hint = picks.length ? 'Slide or tap to pick one' : 'Expenses you add more than once show up here.';
 
   // Fan from 150° to 30° around the + centre, the most repeated straight above it and the rest
@@ -107,9 +108,8 @@ export async function openFrequent({ plus, pointerId }) {
     el.classList.add('on');
     chosen = picks[el.dataset.pick];
     root.classList.add('choosing');
-    menu.innerHTML = `<p class="fq-mh">Add <b>${esc(label(chosen))} · Rp ${formatNum(chosen.amount)}</b></p>
-      ${when(today, 'Today', 'sun')}${when(yesterday, 'Yesterday', 'history')}
-      <button type="button" role="menuitem" data-when="">Pick a date…${icon('cal')}</button>`;
+    menu.innerHTML = `<p class="fq-mh">${esc(label(chosen))}<span class="num">Rp ${formatNum(chosen.amount)}</span></p>
+      ${when(today, 'Today', 'sun')}${when(yesterday, 'Yesterday', 'history')}${when('', 'Pick a date…', 'cal', '')}`;
     menu.style.bottom = `${innerHeight - parseFloat(el.style.top) + 52}px`;
     menu.hidden = false;
     menu.querySelector('[data-when]').focus({ preventScroll: true });
