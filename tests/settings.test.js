@@ -6,10 +6,9 @@ import { DEFAULT_CATEGORIES } from '../js/categories.js';
 
 const NOW = Date.UTC(2026, 9, 13, 12);
 const linked = { linked: true, lastError: null, lastSyncAt: NOW };
-const status = (meta, pending = 0, url = 'https://x/exec') => syncStatus({ url, meta, pending, now: NOW });
+const status = (meta, pending = 0) => syncStatus({ meta, pending, now: NOW });
 
 test('syncStatus: setup and error states win over pending and synced', () => {
-  assert.equal(status(linked, 3, ''), 'Not set up — see SETUP.md');
   assert.equal(status({ ...linked, linked: false }, 3), 'Not set up');
   assert.equal(status({ ...linked, lastError: 'auth' }, 3), 'Wrong passphrase');
   assert.equal(status({ ...linked, lastError: 'network' }, 3), "Can't reach Google — will retry");

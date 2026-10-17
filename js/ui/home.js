@@ -3,7 +3,6 @@ import { inMonth, total, byDay, dailyStrip, compareToLastMonth } from '../stats.
 import { formatNum, formatRp } from '../money.js';
 import { DEFAULT_CATEGORIES, OTHER_ID, emoji } from '../categories.js';
 import { icon } from '../icons.js';
-import { SHEET_URL } from '../config.js';
 import { openEntry, startRestore, render } from '../app.js';
 import { installCardVisible, dismissInstallCard } from '../install.js';
 import { install, openPassphrase } from './settings.js';
@@ -176,11 +175,11 @@ export async function renderHome(root, state) {
   const cats = new Map(categories.map((c) => [c.id, c]));
 
   // Shown until linked, even with entries: the only sign on home that backup is paused.
-  const restore = SHEET_URL && !meta.linked && !state.restoreDismissed ? restoreCard() : '';
+  const restore = !meta.linked && !state.restoreDismissed ? restoreCard() : '';
   const nudge = !restore && installCardVisible() ? installCard() : ''; // the restore card wins
   const card = restore || nudge;
   // Restore card dismissed ("Start fresh") with expenses on the phone: say they are not backed up.
-  const warn = SHEET_URL && !meta.linked && !restore && all.length ? backupWarning() : '';
+  const warn = !meta.linked && !restore && all.length ? backupWarning() : '';
   const body = warn + (month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : restore || nudge + emptyMonth());
 
   root.innerHTML = `<header class="hd">

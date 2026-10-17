@@ -32,17 +32,9 @@ The app keeps your expenses on your phone. This one-time setup gives it a Google
 
    If you see a Google sign-in page or an error instead, go to **Deploy › Manage deployments** and confirm **Who has access** is **Anyone**.
 
-10. **Give the URL to the app.** Open `js/config.js` in this repository and set:
+10. **Keep the URL private.** Copy the web app URL into your password manager next to the passphrase. Do not commit it to this repository or post it anywhere: the app's code is public, so the URL lives only on your phone. Anyone who has both the URL and the passphrase can read your backup.
 
-    ```js
-    export const SHEET_URL = 'https://script.google.com/macros/s/XXXX/exec';
-    ```
-
-    In the same commit, open `sw.js` and change the `CACHE` version to the next one (for example `et-v1` to `et-v2`). An installed app keeps serving its cached `js/config.js` until `sw.js` changes.
-
-    Commit and push, then wait for GitHub Pages to publish. The URL is not a secret and may be committed. The passphrase is the secret and must never be committed.
-
-11. **Connect the phone.** In the app open **Settings › Google Sheet sync**, enter the passphrase, and tap **Connect**. Accept Chrome's offer to save the password. The first connection creates the two tabs in your Sheet.
+11. **Connect the phone.** In the app open **Settings › Google Sheet sync**, paste the web app URL, enter the passphrase, and tap **Connect**. Accept Chrome's offer to save them: on a new phone signed in to the same Google account, Chrome fills both in. The first connection creates the two tabs in your Sheet.
 
 12. **Check the backup.** In the app, save an expense with the note `=1+1 '90s 1/2`. When **Settings › Google Sheet sync** shows **Synced**, open the Sheet's `Expenses` tab. The note cell must show exactly `=1+1 '90s 1/2` (not `2`), and the date cell must show text like `2026-10-13`. If either differs, the tabs were probably made by hand, not by the script: delete the `Expenses` and `Categories` tabs, then tap **Settings › Restore from Sheet** and restore. The script recreates both tabs and the app sends everything again. If the check still fails, open an issue in this repository. Delete the test expense afterwards.
 
@@ -60,7 +52,15 @@ Editing `Code.gs` in the editor does not change the live web app until you redep
 2. Click the pencil icon (**Edit**) on your deployment.
 3. Set **Version** to **New version**, then click **Deploy**.
 
-The URL stays the same, so `js/config.js` does not change. Do not use **New deployment** for this: it creates a second, different URL.
+The URL stays the same, so the app needs no change. Do not use **New deployment** for this: it creates a second, different URL.
+
+## If the URL was ever public
+
+Older versions of this app kept the URL in `js/config.js`, so it is still in this repository's public history. Retire it:
+
+1. **Deploy › New deployment**, the same settings as step 6. Copy the new URL into your password manager.
+2. **Deploy › Manage deployments**, select the old deployment, click **Archive**. The old URL stops answering.
+3. In the app, **Settings › Google Sheet sync**: paste the new URL, enter the passphrase, **Connect**.
 
 ## Notes
 

@@ -16,13 +16,17 @@ const CHUNK = 200; // records per upsert: a big outbox (after link) never makes 
 // offline | timeout | network | http <status> | bad-reply | script.
 const fail = (error, detail) => ({ ok: false, error, ...(detail && { detail }) });
 
+// The web app URL is a second secret next to the passphrase: it is typed in once per phone and
+// kept in meta, never in the public code. Only an Apps Script web app gets the passphrase.
+export const validUrl = (u) => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u);
+
 // One-way push to the owner's Sheet (Apps Script web app) plus link/restore.
 // The passphrase only ever travels in the POST body, never the URL, and is never logged.
-export function createSync({ url, fetch, store }) {
+export function createSync({ fetch, store }) {
   let inflight = null;
 
   // POST one op. Resolves {ok:true, data} or {ok:false, error, detail?}; never rejects.
-  async function call(payload) {
+  async function call(url, payload) {
     let res;
     try {
       res = await fetch(url, {
@@ -49,6 +53,7 @@ export function createSync({ url, fetch, store }) {
   async function doPush() {
     const meta = await store.getMeta();
     if (!meta.linked) return fail('unlinked');
+    if (!validUrl(meta.url)) return fail('nourl');
 
     const outbox = await store.getOutbox();
     const gone = []; // entries whose record no longer exists: nothing to send
@@ -69,7 +74,7 @@ export function createSync({ url, fetch, store }) {
       const chunk = sent.slice(i, i + CHUNK);
       const body = { op: 'upsert', pass: meta.passphrase, expenses: [], categories: [] };
       for (const [{ kind }, rec] of chunk) body[kind === 'expense' ? 'expenses' : 'categories'].push(rec);
-      const r = await call(body);
+      const r = await call(meta.url, body);
       if (!r.ok) {
         await store.setMeta({ lastError: r.error, lastErrorDetail: r.detail ?? null });
         return r;
@@ -83,14 +88,13 @@ export function createSync({ url, fetch, store }) {
   }
 
   function push() {
-    if (!url) return Promise.resolve(fail('nourl'));
     if (!inflight) inflight = doPush().finally(() => { inflight = null; });
     return inflight;
   }
 
-  async function link(pass) {
-    if (!url) return fail('nourl');
-    const r = await call({ op: 'pull', pass });
+  async function link(pass, url) {
+    if (!validUrl(url)) return fail('nourl');
+    const r = await call(url, { op: 'pull', pass });
     if (!r.ok) return r;
     const { data } = r;
     if (!Array.isArray(data.expenses) || !Array.isArray(data.categories)) return fail('server', 'bad-reply');
@@ -111,9 +115,9 @@ export function createSync({ url, fetch, store }) {
       : { ok: true, pulled, pushed: 0, pushError: p.error };
   }
 
-  async function remoteCount(pass) {
-    if (!url) return fail('nourl');
-    const r = await call({ op: 'count', pass });
+  async function remoteCount(pass, url) {
+    if (!validUrl(url)) return fail('nourl');
+    const r = await call(url, { op: 'count', pass });
     if (!r.ok) return r;
     return typeof r.data.expenses === 'number' ? { ok: true, count: r.data.expenses } : fail('server', 'bad-reply');
   }

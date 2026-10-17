@@ -1,5 +1,4 @@
 import * as store from '../store.js';
-import { SHEET_URL } from '../config.js';
 import { toCSV, fromCSV } from '../csv.js';
 import { mergeRecords } from '../merge.js';
 import { icon } from '../icons.js';
@@ -7,12 +6,11 @@ import { canPrompt, isInstalled, promptInstall } from '../install.js';
 import { sync, syncNow, render } from '../app.js';
 import { esc, localISO } from './home.js';
 
-const NOT_SET_UP = 'Not set up — see SETUP.md';
 const UNREACHABLE = "Can't reach Google — will retry";
 const BAD_REPLY = 'Unexpected reply from the script — try redeploying';
 const REASONS = { offline: "You're offline — will retry", timeout: 'Google took too long — will retry', 'bad-reply': BAD_REPLY, script: BAD_REPLY };
-const PASS_HINT = 'Enter the passphrase you set in the Apps Script.';
-const FORM_ERRORS = { auth: 'Wrong passphrase', nourl: NOT_SET_UP }; // anything else: can't reach
+const PASS_HINT = 'Enter your Apps Script web app URL and the passphrase you set in it.';
+const FORM_ERRORS = { auth: 'Wrong passphrase', nourl: 'Paste the web app URL ending in /exec' }; // anything else: can't reach
 
 const PROTECT_HINT = "Chrome protects this app's data once it's installed. Open Chrome's ⋮ menu › Add to Home screen"
   + ' (or Install app), then open the app from your home screen. Keep Sheet sync or a CSV export as a backup.';
@@ -37,8 +35,7 @@ function failReason(error, detail) {
 }
 
 // Sync row subtitle, most urgent state first.
-export function syncStatus({ url, meta, pending, now }) {
-  if (!url) return NOT_SET_UP;
+export function syncStatus({ meta, pending, now }) {
   if (!meta.linked) return 'Not set up';
   if (meta.lastError) return failReason(meta.lastError, meta.lastErrorDetail);
   if (pending) return `${plural(pending, 'change')} waiting`;
@@ -127,16 +124,18 @@ const sayIn = (dlg, el) => (msg) => {
   el.hidden = false;
 };
 
-// Connect (sync row) or restore (home card, Settings row). A real <form> with a username/password
-// pair so Chrome offers to save the passphrase. The passphrase only goes to sync: never logged.
+// Connect (sync row) or restore (home card, Settings row). A real <form> whose username is the web
+// app URL, so Chrome saves URL and passphrase together and fills both on a new phone. Neither is
+// in the public code; the passphrase only goes to sync and is never logged.
 export function openPassphrase(mode) {
   const restore = mode === 'restore';
   const verb = restore ? 'Restore' : 'Connect';
   const dlg = openSheet(restore ? 'Restore from Sheet' : 'Connect Google Sheet', `<form>
     <p class="ce-txt">${PASS_HINT}</p>
-    <input type="text" name="username" autocomplete="username" value="expense-tracker" hidden>
+    <input class="note" type="url" name="username" autocomplete="username" inputmode="url" spellcheck="false"
+      placeholder="https://script.google.com/macros/s/…/exec" aria-label="Web app URL" required autofocus>
     <input class="note" type="password" name="password" autocomplete="current-password"
-      placeholder="Passphrase" aria-label="Passphrase" required autofocus>
+      placeholder="Passphrase" aria-label="Passphrase" required>
     <p class="es-err" role="alert" hidden></p>
     <div class="btns">
       <button class="btn primary" type="submit">${verb}</button>
@@ -144,7 +143,13 @@ export function openPassphrase(mode) {
     </div>
   </form>`);
   const $ = (s) => dlg.querySelector(s);
-  const [txt, input, err, submit, cancel] = ['.ce-txt', '[name=password]', '.es-err', '[type=submit]', '[data-act=close].btn'].map($);
+  const [txt, url, input, err, submit, cancel] = ['.ce-txt', '[name=username]', '[name=password]', '.es-err', '[type=submit]', '[data-act=close].btn'].map($);
+  // A linked phone (reconnecting after a wrong passphrase) already knows its URL.
+  store.getMeta().then((m) => {
+    if (!m.url || url.value) return;
+    url.value = m.url;
+    input.focus();
+  }).catch(() => {});
   const say = sayIn(dlg, err);
   let count = null; // restore: the Sheet's expense count once it answered; Restore then links
 
@@ -152,7 +157,7 @@ export function openPassphrase(mode) {
     count = n;
     txt.textContent = n === null ? PASS_HINT : `Your Sheet has ${plural(n, 'expense')}. Restore them?`;
     txt.classList.toggle('ask', n !== null);
-    input.hidden = n !== null;
+    url.hidden = input.hidden = n !== null;
     cancel.hidden = n === null;
   }
 
@@ -163,7 +168,8 @@ export function openPassphrase(mode) {
     err.hidden = true;
     let r;
     try {
-      r = restore && count === null ? await sync.remoteCount(input.value) : await sync.link(input.value);
+      const u = url.value.trim();
+      r = restore && count === null ? await sync.remoteCount(input.value, u) : await sync.link(input.value, u);
     } catch (e) {
       console.error(e);
       r = { ok: false, msg: `Couldn't ${verb.toLowerCase()}: ${e.message ?? e}` };
@@ -172,7 +178,7 @@ export function openPassphrase(mode) {
     if (!r.ok) {
       ask(null);
       say(r.msg ?? FORM_ERRORS[r.error] ?? "Can't reach Google");
-      return input.focus();
+      return (r.error === 'nourl' ? url : input).focus();
     }
     if ('count' in r) {
       ask(r.count);
@@ -326,11 +332,11 @@ export async function renderSettings(root) {
     Promise.resolve(navigator.storage?.persisted?.()).catch(() => false),
     Promise.resolve(navigator.storage?.estimate?.()).catch(() => undefined),
   ]);
-  const status = syncing ? 'Syncing…' : syncStatus({ url: SHEET_URL, meta, pending: outbox.length, now: Date.now() });
-  const fixable = SHEET_URL && (!meta.linked || meta.lastError === 'auth');
-  const on = SHEET_URL && meta.linked && !meta.lastError;
+  const status = syncing ? 'Syncing…' : syncStatus({ meta, pending: outbox.length, now: Date.now() });
+  const fixable = !meta.linked || meta.lastError === 'auth';
+  const on = meta.linked && !meta.lastError;
   // Linked with a network/server error or changes waiting: a tap syncs now.
-  const tap = fixable ? 'connect' : SHEET_URL && meta.linked && (syncing || meta.lastError || outbox.length) && 'sync';
+  const tap = fixable ? 'connect' : meta.linked && (syncing || meta.lastError || outbox.length) && 'sync';
 
   root.innerHTML = `<header class="bar"><a class="ib" href="#/" aria-label="Back">${icon('back')}</a><h1>Settings</h1></header>
   <section class="set">
@@ -338,7 +344,7 @@ export async function renderSettings(root) {
     <div class="lst">
       ${row({ ico: 'cloud', title: 'Google Sheet sync', sub: status, act: tap, disabled: syncing, end: on ? '<span class="dot"></span>On' : '' })}
       ${row({ ico: 'shield', title: 'Storage', sub: storageLine(persisted, estimate?.usage), act: 'storage' })}
-      ${row({ ico: 'back', title: 'Restore from Sheet', sub: SHEET_URL ? '' : NOT_SET_UP, act: SHEET_URL && 'restore' })}
+      ${row({ ico: 'back', title: 'Restore from Sheet', act: 'restore' })}
     </div>
     <h2 class="sg">Data</h2>
     <div class="lst">

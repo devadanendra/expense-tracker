@@ -13,7 +13,7 @@ const KEYBOARD_KEYS = /^([0-9+\-×÷]|back)$/;
 
 const key = (k) => `<button class="k${OP_LABELS[k] ? ' op' : ''}" type="button" data-k="${k}"${
   OP_LABELS[k] ? ` aria-label="${OP_LABELS[k]}"` : ''}>${FACES[k] ?? k}</button>`;
-// Grid order per mockup; the save key spans rows 4-5 of the last column.
+// The save key spans rows 4-5 of the last column.
 const PAD = ['AC', '×', '÷', 'back', '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3'].map(key).join('')
   + `<button class="k go" type="button" data-act="save" aria-label="Save">${icon('check')}</button>`
   + ['0', '000'].map(key).join('');

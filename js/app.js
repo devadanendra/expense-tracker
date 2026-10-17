@@ -1,6 +1,5 @@
 import { onInstallChange } from './install.js';
 import * as store from './store.js';
-import { SHEET_URL } from './config.js';
 import { createSync } from './sync.js';
 import { renderHome, localISO } from './ui/home.js';
 import { openEntrySheet } from './ui/entry-sheet.js';
@@ -19,7 +18,7 @@ export function openEntry(expense) {
   openEntrySheet({ expense }).catch((e) => console.error(e));
 }
 // fetch is wrapped: an unbound window.fetch throws "Illegal invocation".
-export const sync = createSync({ url: SHEET_URL, fetch: (...a) => fetch(...a), store });
+export const sync = createSync({ fetch: (...a) => fetch(...a), store });
 
 // Home restore card: passphrase, "Your Sheet has N expenses. Restore them?", then link.
 export function startRestore() {
@@ -34,7 +33,7 @@ let pushTimer = 0;
 let mutedUntil = 0;
 async function autoPush() {
   clearTimeout(pushTimer);
-  if (!SHEET_URL || !(await store.getMeta()).linked || !(await store.getOutbox()).length) return;
+  if (!(await store.getMeta()).linked || !(await store.getOutbox()).length) return;
   const r = await sync.push();
   if (r.ok) return r;
   mutedUntil = Date.now() + 60000;
@@ -144,14 +143,6 @@ function renderSoon() {
   renderTimer = setTimeout(render, 30);
 }
 
-// A changed SHEET_URL points at a Sheet without what earlier pushes sent: queue everything once.
-async function adoptSheetUrl() {
-  const meta = await store.getMeta();
-  if (!SHEET_URL || !meta.linked || meta.url === SHEET_URL) return;
-  await store.markAllDirty();
-  await store.setMeta({ url: SHEET_URL });
-}
-
 // The "New expense" app shortcut opens #/add: land on home (replacing the hash, so back never
 // loops), then open the entry sheet.
 async function route() {
@@ -173,7 +164,6 @@ export async function boot() {
     document.getElementById('app').textContent = `Can't open storage: ${e.message}`;
     return;
   }
-  await adoptSheetUrl().catch((e) => console.error(e));
   // Tap + for the entry sheet; hold it (or the menu key) for the Frequent arc, which follows the
   // still-held finger. A ring fills while holding (.holding). The tap that ends a hold only
   // releases it.
