@@ -12,7 +12,7 @@ let isOpen = false;
 
 // Lifting a held finger can still fire a click at whatever is under it (the ×, the dim, a list
 // row once the arc closes): swallow the one that follows.
-function eatNextClick() {
+export function eatNextClick() {
   const eat = (e) => {
     e.stopPropagation();
     e.preventDefault();
