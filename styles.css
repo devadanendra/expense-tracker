@@ -146,6 +146,14 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 .card .ring { background: var(--bg2); box-shadow: none; }
 .btns { display: flex; gap: 8px; margin-top: 18px; }
 .card.install { padding: 18px 16px 16px; }
+/* Home: shown while this phone has expenses but no Sheet backup. */
+.bk {
+  width: 100%; min-height: 44px; margin-top: 16px; padding: 10px 14px; border-radius: 14px; display: flex; align-items: center; gap: 10px;
+  background: color-mix(in srgb, #d97706 14%, var(--surf)); font-size: 14px; font-weight: 600; text-align: left;
+}
+.bk svg { width: 20px; height: 20px; color: #d97706; }
+.bk span { flex: 1; }
+.bk b { color: var(--ac); }
 .card.install h2 { margin-top: 0; }
 .card.install .btns { margin-top: 14px; }
 .btn { flex: 1; min-height: 44px; border-radius: 14px; background: var(--bg2); font-weight: 600; }

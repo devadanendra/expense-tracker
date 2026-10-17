@@ -6,7 +6,7 @@ import { icon } from '../icons.js';
 import { SHEET_URL } from '../config.js';
 import { openEntry, startRestore, render } from '../app.js';
 import { installCardVisible, dismissInstallCard } from '../install.js';
-import { install } from './settings.js';
+import { install, openPassphrase } from './settings.js';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'];
@@ -104,6 +104,8 @@ const restoreCard = () => `<div class="card restore">
     </div>
   </div>`;
 
+const backupWarning = () => `<button class="bk" type="button" data-act="connect">${icon('cloud')}<span>Not backed up</span><b>Turn on</b></button>`;
+
 const installCard = () => `<div class="card install">
     <h2>Install Expense Tracker</h2>
     <p>One tap from your home screen, and your data stays protected.</p>
@@ -177,7 +179,9 @@ export async function renderHome(root, state) {
   const restore = SHEET_URL && !meta.linked && !state.restoreDismissed ? restoreCard() : '';
   const nudge = !restore && installCardVisible() ? installCard() : ''; // the restore card wins
   const card = restore || nudge;
-  const body = month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : restore || nudge + emptyMonth();
+  // Restore card dismissed ("Start fresh") with expenses on the phone: say they are not backed up.
+  const warn = SHEET_URL && !meta.linked && !restore && all.length ? backupWarning() : '';
+  const body = warn + (month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : restore || nudge + emptyMonth());
 
   root.innerHTML = `<header class="hd">
     ${monthHeader(ym, total(month), `<div class="acts">
@@ -197,6 +201,7 @@ export async function renderHome(root, state) {
     switch (el.dataset.act) {
       case 'restore': return startRestore();
       case 'fresh': state.restoreDismissed = true; return render();
+      case 'connect': return openPassphrase('connect');
       case 'install': return install();
       case 'later': dismissInstallCard(); return render();
     }
