@@ -52,11 +52,16 @@ function parseCSV(text) {
   return rows;
 }
 
-const validDate = (s) => {
+// The app's own input limits (entry sheet, category editor). A longer text from a CSV would also
+// make the Sheet reject the whole upsert chunk it rides in.
+export const NOTE_MAX = 120;
+export const NAME_MAX = 40;
+
+export const validDate = (s) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   return !!m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toISOString().slice(0, 10) === s;
 };
-const validTime = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+export const validTime = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 // parseAmount strips every dot ('1.5' -> 15), so only accept dots as 3-digit thousands groups.
 const AMOUNT_RE = /^(Rp\s*)?(\d+|\d{1,3}(\.\d{3})+)$/i;
 
@@ -108,10 +113,13 @@ export function fromCSV(text, categories, now) {
     if (!validDate(date)) return bad('invalid date');
     if (!validTime(time)) return bad('invalid time');
     if (!Number.isSafeInteger(amount) || amount <= 0) return bad('invalid amount');
+    const note = undefuse(r[col.note]);
+    if (note.length > NOTE_MAX) return bad(`note longer than ${NOTE_MAX} characters`);
+    if (get('category').length > NAME_MAX) return bad(`category name longer than ${NAME_MAX} characters`);
     if (seen.has(id)) return bad('duplicate id');
     seen.add(id);
     expenses.push({
-      id, amount, categoryId: categoryFor(get('category')), date, time, note: undefuse(r[col.note]),
+      id, amount, categoryId: categoryFor(get('category')), date, time, note,
       createdAt: now, updatedAt: 0, deleted: false,
     });
   });

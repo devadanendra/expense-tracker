@@ -499,3 +499,17 @@ test('remoteCount maps network and server errors', async () => {
   assert.deepEqual(await mk(store, fakeFetch(() => reply({}, 502))).remoteCount(PASS), { ok: false, error: 'server', detail: 'http 502' });
   assert.deepEqual(await mk(store, fakeFetch(() => ({ ok: true }))).remoteCount(PASS), { ok: false, error: 'server', detail: 'bad-reply' });
 });
+
+test('link skips pulled records a hand edit in the Sheet broke, keeps the rest', async () => {
+  const store = fakeStore();
+  const remote = [
+    exp('ok', 1), exp('bad-date', 1, { date: 'Tue Oct 17 2026' }), exp('bad-time', 1, { time: '25:00' }),
+    exp('zero', 1, { amount: 0 }), exp('no-note', 1, { note: undefined }),
+  ];
+  const fetch = fakeFetch((body) =>
+    body.op === 'pull' ? { ok: true, expenses: remote, categories: [cat('c1', 1), cat('nameless', 1, { name: 5 })] } : { ok: true });
+  const res = await mk(store, fetch).link(PASS);
+  assert.equal(res.ok, true);
+  assert.deepEqual([...store.recs.expense.keys()], ['ok']);
+  assert.deepEqual([...store.recs.category.keys()], ['c1']);
+});

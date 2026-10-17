@@ -2,6 +2,7 @@ import * as store from '../store.js';
 import { createCalc } from '../calc.js';
 import { formatNum } from '../money.js';
 import { OTHER_ID } from '../categories.js';
+import { NOTE_MAX } from '../csv.js';
 import { icon } from '../icons.js';
 import { esc, chip, localISO, shortDate } from './home.js';
 
@@ -78,7 +79,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
         <input class="dt-input" type="date" max="${today}" tabindex="-1" aria-hidden="true">
         <button class="lnk" type="button" data-date=""></button>
       </div>
-      <label class="fld">${icon('note')}<input class="es-note" type="text" maxlength="120" placeholder="Add a note…" aria-label="Note" autocomplete="off"></label>
+      <label class="fld">${icon('note')}<input class="es-note" type="text" maxlength="${NOTE_MAX}" placeholder="Add a note…" aria-label="Note" autocomplete="off"></label>
       <p class="es-err" role="alert" hidden></p>
     </div>
     <div class="pad num">${PAD}</div>
