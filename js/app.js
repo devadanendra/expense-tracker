@@ -174,26 +174,38 @@ export async function boot() {
     return;
   }
   await adoptSheetUrl().catch((e) => console.error(e));
-  // Tap + for the entry sheet; hold it (or the menu key) for Frequent. The tap that ends a hold
-  // only releases it.
+  // Tap + for the entry sheet; hold it (or the menu key) for the Frequent arc, which follows the
+  // still-held finger. A ring fills while holding (.holding). The tap that ends a hold only
+  // releases it.
   const plus = document.querySelector('.nav .p');
   let holdTimer = 0;
   let held = false;
+  let downId;
   const hold = () => {
+    clearTimeout(holdTimer);
+    plus.classList.remove('holding');
     held = true;
     navigator.vibrate?.(10);
-    openFrequent({ onNew: () => openEntry() }).catch((e) => console.error(e));
+    openFrequent({ plus, pointerId: downId }).catch((e) => console.error(e));
   };
   plus.addEventListener('pointerdown', (e) => {
-    if (e.button > 0) return;
     held = false;
+    downId = undefined;
+    if (e.button > 0) return;
+    downId = e.pointerId;
+    plus.classList.add('holding');
     holdTimer = setTimeout(hold, 450);
   });
-  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) plus.addEventListener(t, () => clearTimeout(holdTimer));
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) {
+    plus.addEventListener(t, () => {
+      clearTimeout(holdTimer);
+      plus.classList.remove('holding');
+      if (t !== 'pointerleave') downId = undefined;
+    });
+  }
   plus.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    clearTimeout(holdTimer);
-    hold();
+    if (!held) hold();
   });
   plus.addEventListener('click', () => {
     if (held) held = false;
