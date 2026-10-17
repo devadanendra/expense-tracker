@@ -1,6 +1,7 @@
 import * as store from '../store.js';
 import { CATEGORY_COLORS, EMOJI, OTHER_ID } from '../categories.js';
 import { icon } from '../icons.js';
+import { NAME_MAX } from '../csv.js';
 import { esc, safeColor, chip } from './home.js';
 
 const ICONS = Object.keys(EMOJI);
@@ -24,7 +25,7 @@ function openEditor(cat, cats) {
       ${cat && cat.id !== OTHER_ID ? '<button class="del" type="button" data-act="delete">Delete</button>' : ''}
       <button class="x" type="button" data-act="close" aria-label="Close">${icon('x')}</button>
     </div>
-    <input class="note" type="text" maxlength="40" placeholder="Name" aria-label="Name" autocomplete="off" required${cat ? '' : ' autofocus'}>
+    <input class="note" type="text" maxlength="${NAME_MAX}" placeholder="Name" aria-label="Name" autocomplete="off" required${cat ? '' : ' autofocus'}>
     <p class="ce-lbl">Color</p>
     <div class="pick" role="group" aria-label="Color">${CATEGORY_COLORS.map((c) =>
       `<button type="button" data-color="${c}" aria-label="Color ${c}"><span class="chip" style="background:${c}"></span></button>`).join('')}

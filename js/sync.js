@@ -1,9 +1,16 @@
 import { mergeRecords } from './merge.js';
+import { validDate, validTime } from './csv.js';
 
 const KINDS = [
   ['expense', 'allExpenses', 'expenses'],
   ['category', 'allCategories', 'categories'],
 ];
+// Sheet cells are free text: a pulled record a hand edit broke is skipped, not stored to crash a view.
+const VALID = {
+  expenses: (e) => validDate(e.date) && validTime(e.time) && Number.isSafeInteger(e.amount) && e.amount > 0
+    && typeof e.categoryId === 'string' && typeof e.note === 'string',
+  categories: (c) => typeof c.name === 'string',
+};
 const CHUNK = 200; // records per upsert: a big outbox (after link) never makes one request slow enough to time out
 // detail, on network/server failures only, says why for the sync row:
 // offline | timeout | network | http <status> | bad-reply | script.
@@ -90,7 +97,7 @@ export function createSync({ url, fetch, store }) {
 
     let pulled = 0;
     for (const [kind, readLocal, key] of KINDS) {
-      const { changed } = mergeRecords(await store[readLocal](), data[key]);
+      const { changed } = mergeRecords(await store[readLocal](), data[key].filter(VALID[key]));
       if (changed.length) await store.putMany(kind, changed);
       pulled += changed.length;
     }

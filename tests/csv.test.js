@@ -239,3 +239,13 @@ test('toCSV defuses formula-leading fields', () => {
   assert.ok(out.includes(`"'=HYPERLINK(""x"")"`));
   assert.ok(out.includes(",'@evil,"));
 });
+
+test('import rejects a note or category name longer than the app allows', () => {
+  const long = 'x'.repeat(121);
+  const { expenses, newCategories, errors } = fromCSV(
+    `${HEADER}\n2026-10-01,08:00,1000,Food & Drink,${long},a\n2026-10-01,08:00,1000,${'y'.repeat(41)},,b\n2026-10-01,08:00,1000,Food & Drink,${'z'.repeat(120)},c`,
+    cats, NOW);
+  assert.deepEqual(expenses.map((e) => e.id), ['c']);
+  assert.deepEqual(newCategories, []);
+  assert.deepEqual(errors, ['Row 2: note longer than 120 characters', 'Row 3: category name longer than 40 characters']);
+});

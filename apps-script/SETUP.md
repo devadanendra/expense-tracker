@@ -50,6 +50,8 @@ The app keeps your expenses on your phone. This one-time setup gives it a Google
 
 "Anyone" only means Google does not ask visitors to sign in. Every request is rejected unless it carries the passphrase, and the script never returns data without it. So the passphrase is the lock: keep it long and private, and anyone who only has the URL gets nothing. If you ever think the passphrase leaked, change the `PASSPHRASE` script property (step 5) and reconnect the app. No redeploy is needed for that.
 
+Never share this Sheet with edit access. An editor can open the script, read `PASSPHRASE` and change what the web app does.
+
 ## Changing the code later
 
 Editing `Code.gs` in the editor does not change the live web app until you redeploy:
