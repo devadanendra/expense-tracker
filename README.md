@@ -20,6 +20,8 @@ npm test
 
 Repository **Settings › Pages › Build and deployment › Deploy from a branch**, branch `main`, folder `/ (root)`.
 
+**Give the app its own origin.** The browser walls off data by origin (`https://host`), not by path. On `<user>.github.io/expense-tracker`, every other page under `<user>.github.io`, such as the user site or another repo's Pages, can read the app's expenses and its saved passphrase. Serve it where nothing else runs: a custom subdomain (a `CNAME` file), or a GitHub account or organization that hosts nothing else on Pages. Moving origin starts the phone empty: connect it with **Restore** to pull everything back from the Sheet.
+
 ## Install on your phone
 
 Open the Pages URL in Chrome, then **⋮ › Add to Home screen** (or **Install app**).
