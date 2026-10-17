@@ -369,6 +369,19 @@ textarea.note { height: auto; padding: 10px 14px; resize: vertical; font-size: 1
 .toast:empty { opacity: 0; }
 dialog .toast { top: 16px; bottom: auto; } /* above a bottom sheet, not over its buttons */
 
+/* ---------- Page change (js/app.js render) ---------- */
+/* The new page fades in over the old one, which stays opaque so the background never shows
+   through; both drift with the page's depth: in from the right going deeper, from the left back. */
+:root { --vt-x: 0px; }
+:root[data-vt="fwd"] { --vt-x: 28px; }
+:root[data-vt="back"] { --vt-x: -28px; }
+.nav { view-transition-name: nav; }
+::view-transition-old(root) { animation: vt-out .28s cubic-bezier(.2, .8, .2, 1) both; }
+::view-transition-new(root) { animation: vt-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes vt-in { from { opacity: 0; transform: translateX(var(--vt-x)); } }
+@keyframes vt-out { to { transform: translateX(calc(var(--vt-x) * -.3)); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

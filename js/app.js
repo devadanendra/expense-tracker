@@ -62,14 +62,22 @@ const ROUTES = {
   '#/categories': renderCategories,
 };
 const NAV_ROUTES = ['#/', '#/reports'];
-const page = () => (ROUTES[location.hash] ? location.hash : '#/');
+const routeOf = (hash) => (ROUTES[hash] ? hash : '#/');
+const page = () => routeOf(location.hash);
+const depth = (route) => (route === '#/' ? 0 : 1);
 
 // Transactions (#/) is the history root and every other page sits one entry above it, so one
 // system back returns home and back on home leaves the app. Every in-app link comes through here.
+// goingHome stops a double tap on a link home from going back twice, out of the app.
+let goingHome = false;
 function navigate(hash) {
   const from = page();
-  if (hash === from) return;
-  if (hash === '#/' && history.state?.sub) return history.back(); // hashchange renders home
+  uaAnimated = false;
+  if (hash === from || goingHome) return;
+  if (hash === '#/' && history.state?.sub) {
+    goingHome = true;
+    return history.back(); // hashchange renders home
+  }
   if (hash === '#/') history.replaceState(null, '', '#/');
   else if (from === '#/') history.pushState({ sub: 1 }, '', hash);
   else history.replaceState({ sub: 1 }, '', hash);
@@ -78,6 +86,8 @@ function navigate(hash) {
 
 let seq = 0;
 let shown = '';
+// Set by popstate when the browser already animated the back (Android gesture): skip ours then.
+let uaAnimated = false;
 
 // Renders the current route into a fresh container and swaps it in only if no newer render
 // started meanwhile, so overlapping async renders never leave stale data on screen.
@@ -96,22 +106,33 @@ export async function render() {
     view.firstChild.textContent = `Something went wrong: ${e.message ?? e}`;
   }
   if (my !== seq) return;
-  const app = document.getElementById('app');
-  const prev = document.activeElement;
-  const keep = route === shown && prev?.id && app.contains(prev) ? prev : null;
-  const sel = [keep?.selectionStart, keep?.selectionEnd];
-  app.replaceChildren(view);
-  const next = keep ? document.getElementById(keep.id) : route !== shown ? view.querySelector('[autofocus]') : null;
-  next?.focus({ preventScroll: true });
-  if (sel[0] != null && next?.setSelectionRange) next.setSelectionRange(...sel);
-  const nav = document.querySelector('.nav');
-  nav.hidden = !NAV_ROUTES.includes(route);
-  for (const a of nav.querySelectorAll('a')) {
-    if (a.getAttribute('href') === route) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
-  }
-  if (route !== shown) scrollTo(0, 0);
-  shown = route;
+  const swap = () => {
+    const app = document.getElementById('app');
+    const prev = document.activeElement;
+    const keep = route === shown && prev?.id && app.contains(prev) ? prev : null;
+    const sel = [keep?.selectionStart, keep?.selectionEnd];
+    app.replaceChildren(view);
+    const next = keep ? document.getElementById(keep.id) : route !== shown ? view.querySelector('[autofocus]') : null;
+    next?.focus({ preventScroll: true });
+    if (sel[0] != null && next?.setSelectionRange) next.setSelectionRange(...sel);
+    const nav = document.querySelector('.nav');
+    nav.hidden = !NAV_ROUTES.includes(route);
+    for (const a of nav.querySelectorAll('a')) {
+      if (a.getAttribute('href') === route) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    }
+    if (route !== shown) scrollTo(0, 0);
+    shown = route;
+  };
+  const animate = shown && route !== shown && !uaAnimated && document.startViewTransition;
+  uaAnimated = false;
+  if (!animate) return swap();
+  // Page change: the new page slides in over a fade, from the side matching its depth (styles.css).
+  const dir = depth(route) - depth(shown);
+  document.documentElement.dataset.vt = dir > 0 ? 'fwd' : dir < 0 ? 'back' : 'fade';
+  const t = document.startViewTransition(swap);
+  t.finished.finally(() => delete document.documentElement.dataset.vt);
+  await t.updateCallbackDone;
 }
 
 // Store changes re-render once a burst of writes settles: link and push each fire several
@@ -133,6 +154,7 @@ async function adoptSheetUrl() {
 // The "New expense" app shortcut opens #/add: land on home (replacing the hash, so back never
 // loops), then open the entry sheet.
 async function route() {
+  goingHome = false;
   const add = location.hash === '#/add';
   if (add) history.replaceState(null, '', '#/');
   await render();
@@ -159,10 +181,25 @@ export async function boot() {
     ev.preventDefault();
     navigate(a.getAttribute('href'));
   });
+  // Builds before et-v8 pushed an entry per link, and a reload or update keeps those, so back
+  // walked through every page visited. Collapse to the app's first entry, then rebuild
+  // Transactions plus at most the page shown. Needs the Navigation API (Chromium, Android PWA).
+  const nav = window.navigation;
+  const i = nav?.currentEntry?.index ?? 0;
+  const onePage = i === 1 && history.state?.sub && routeOf(new URL(nav.entries()[0].url).hash) === '#/';
+  let fresh = !history.state;
+  if (i > 0 && !onePage) {
+    const hash = location.hash;
+    // An entry from before a reload is another document: traversing there reloads, and boot reruns.
+    await nav.traverseTo(nav.entries()[0].key).finished.catch(() => {});
+    history.replaceState(null, '', hash || '#/');
+    fresh = true;
+  }
+  addEventListener('popstate', (e) => (uaAnimated = !!e.hasUAVisualTransition));
   addEventListener('hashchange', route);
   // Cold start on another page: put Transactions under it, so the first back lands there.
   // A reload or restored tab keeps its own state and already has it.
-  if (page() !== '#/' && !history.state) {
+  if (page() !== '#/' && fresh) {
     const hash = location.hash;
     history.replaceState(null, '', '#/');
     history.pushState({ sub: 1 }, '', hash);
