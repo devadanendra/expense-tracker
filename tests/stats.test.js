@@ -149,7 +149,7 @@ test('DEFAULT_CATEGORIES: 12 unique full records ordered 0-11', () => {
   assert.deepEqual(CATEGORY_COLORS, DEFAULT_CATEGORIES.map((c) => c.color));
 });
 
-test('quickPicks: repeats first, then latest; same amount, category and note count as one', () => {
+test('quickPicks: repeats only, most first, then latest; same amount, category and note count as one', () => {
   const picks = quickPicks([
     ex('2026-10-01', '08:00', 25000, 'cat-food', { note: 'Coffee' }),
     ex('2026-10-02', '08:00', 25000, 'cat-food', { note: 'coffee ' }),
@@ -157,18 +157,19 @@ test('quickPicks: repeats first, then latest; same amount, category and note cou
     ex('2026-10-03', '12:00', 15000, 'cat-transport', { note: 'Bus' }),
     ex('2026-10-04', '09:00', 15000, 'cat-transport', { note: 'Bus' }),
     ex('2026-10-05', '19:00', 80000, 'cat-fun'),
-    ex('2026-10-05', '20:00', 99000, 'cat-fun', { deleted: true }),
-    ex('2026-08-01', '08:00', 5000, 'cat-food'),
-  ], '2026-09-06');
+    ex('2026-10-05', '20:00', 80000, 'cat-fun', { deleted: true }),
+    ex('2025-08-01', '08:00', 5000, 'cat-food'),
+    ex('2025-08-02', '08:00', 5000, 'cat-food'),
+  ], 8);
   assert.deepEqual(picks, [
-    { amount: 25000, categoryId: 'cat-food', note: 'Coffee' },
-    { amount: 15000, categoryId: 'cat-transport', note: 'Bus' },
-    { amount: 80000, categoryId: 'cat-fun', note: '' },
+    { amount: 25000, categoryId: 'cat-food', note: 'Coffee', count: 3 },
+    { amount: 15000, categoryId: 'cat-transport', note: 'Bus', count: 2 },
+    { amount: 5000, categoryId: 'cat-food', note: '', count: 2 },
   ]);
 });
 
 test('quickPicks keeps at most n', () => {
-  const many = Array.from({ length: 9 }, (_, i) => ex('2026-10-10', `0${i}:00`, 1000 * (i + 1), 'cat-food'));
-  assert.equal(quickPicks(many, '2026-09-10').length, 6);
-  assert.deepEqual(quickPicks(many, '2026-09-10', 2).map((p) => p.amount), [9000, 8000]);
+  const many = Array.from({ length: 20 }, (_, i) => ex('2026-10-10', `${10 + i}:00`, 1000 * (i % 10 + 1), 'cat-food'));
+  assert.equal(quickPicks(many).length, 8);
+  assert.deepEqual(quickPicks(many, 2).map((p) => p.amount), [10000, 9000]);
 });
