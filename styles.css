@@ -275,6 +275,15 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .gc { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 4px 0; border-radius: 12px; font-size: 12px; font-weight: 500; color: var(--mu); }
 .gl { max-width: 100%; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gc[aria-pressed="true"] { color: var(--tx); font-weight: 600; }
+/* Frequent: a centred modal over the whole screen, not a card from the bottom like Category. */
+.cp.hp { position: fixed; inset: 0; z-index: 3; justify-content: center; padding: 24px 16px; border-radius: 0; }
+.hp .cp-card {
+  width: 100%; max-width: 400px; max-height: min(560px, 100%); margin: 0 auto; padding: 12px 16px 12px 20px;
+  border-radius: 24px; box-shadow: var(--sh2); animation: hp-in .2s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes hp-in { from { opacity: 0; transform: scale(.96); } }
+.hp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.hp h3 { margin: 0; text-align: left; }
 .hp-row { width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 8px 4px; font-size: 15px; font-weight: 500; text-align: left; }
 .hp-row + .hp-row { border-top: 1px solid var(--line); }
 .hp-row:active { opacity: .6; }

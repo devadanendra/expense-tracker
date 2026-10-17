@@ -96,9 +96,8 @@ export async function openEntrySheet({ expense, onDone } = {}) {
       </div>
     </div>
     ${expense ? '' : `<div class="cp hp" hidden>
-      <div class="cp-card" role="group" aria-labelledby="hp-title">
-        <div class="grab" aria-hidden="true"></div>
-        <h3 id="hp-title">Frequent</h3>
+      <div class="cp-card" role="dialog" aria-modal="true" aria-labelledby="hp-title">
+        <div class="hp-head"><h3 id="hp-title">Frequent</h3><button class="ib" type="button" data-act="unpanel" aria-label="Close">${icon('x')}</button></div>
         ${picks.length ? picks.map((p, i) => {
           const cat = cats.find((c) => c.id === p.categoryId);
           const label = p.note || cat.name;
@@ -277,6 +276,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
       case 'delete': return remove();
       case 'cats': return openPanel(catPanel, pill);
       case 'hist': return openPanel(histPanel, $('.hist'));
+      case 'unpanel': return closePanel();
       case 'cal':
         picker.value = date;
         try { picker.showPicker(); } catch { picker.focus(); picker.click(); }
