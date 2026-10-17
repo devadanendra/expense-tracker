@@ -1,5 +1,5 @@
 // Bump on every release (et-v1 -> et-v2 ...) so installed phones fetch the new files.
-const CACHE = 'et-v13';
+const CACHE = 'et-v14';
 const SHELL = [
   './',
   'index.html',
@@ -13,7 +13,6 @@ const SHELL = [
   'js/app.js',
   'js/calc.js',
   'js/categories.js',
-  'js/config.js',
   'js/csv.js',
   'js/db.js',
   'js/icons.js',

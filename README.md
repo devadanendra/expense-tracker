@@ -28,7 +28,7 @@ Open the Pages URL in Chrome, then **⋮ › Add to Home screen** (or **Install 
 
 ## Release
 
-Bump `CACHE` in `sw.js` (`et-v1` → `et-v2` …) on every deploy, including the `js/config.js` change in [SETUP step 10](apps-script/SETUP.md), or installed phones keep the old files.
+Bump `CACHE` in `sw.js` (`et-v1` → `et-v2` …) on every deploy, or installed phones keep the old files.
 
 ## Google Sheet backup
 
