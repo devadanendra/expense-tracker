@@ -2,7 +2,7 @@ import * as store from '../store.js';
 import { quickPicks } from '../stats.js';
 import { formatNum } from '../money.js';
 import { icon } from '../icons.js';
-import { esc, chip, localISO } from './home.js';
+import { esc, chip, localISO, shortDate } from './home.js';
 import { toast } from './settings.js';
 
 const RADIUS = 130; // px from the + button's centre to each circle's centre
@@ -22,8 +22,8 @@ function eatNextClick() {
 }
 
 // Repeated expenses fanned out in an arc over the + button, opened by holding it. Keep the finger
-// down, slide onto one and let go to add it for today; or let go anywhere and tap one. Either way a
-// toast offers Undo. × , the dim, Android back and Escape close it. pointerId is the holding
+// down, slide onto one and let go, or let go anywhere and tap one; then pick the day (Today,
+// Yesterday or any date) to add it. A toast offers Undo. × , the dim, Android back and Escape close it. pointerId is the holding
 // pointer (none when opened from the keyboard).
 export async function openFrequent({ plus, pointerId }) {
   if (isOpen) return;
@@ -54,7 +54,9 @@ export async function openFrequent({ plus, pointerId }) {
   picks = picks.filter((p) => cats.some((c) => c.id === p.categoryId)).slice(0, 5);
   const label = (p) => p.note || cats.find((c) => c.id === p.categoryId).name;
   const tok = Date.now();
-  const hint = picks.length ? 'Slide or tap to add for today' : 'Expenses you add more than once show up here.';
+  const today = localISO();
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return localISO(d); })();
+  const hint = picks.length ? 'Slide or tap to pick one' : 'Expenses you add more than once show up here.';
 
   // Fan from 150° to 30° around the + centre, the most repeated straight above it and the rest
   // alternating outwards (left, right, ...).
@@ -71,19 +73,22 @@ export async function openFrequent({ plus, pointerId }) {
   const root = document.createElement('div');
   root.className = 'fq';
   root.innerHTML = `<div class="fq-dim" aria-hidden="true"></div>
-  <p class="fq-tip" aria-live="polite" style="bottom:${innerHeight - cy + RADIUS + 64}px">${hint}</p>
+  <div class="fq-tip" aria-live="polite" style="bottom:${innerHeight - cy + RADIUS + 64}px">${hint}</div>
+  <input class="dt-input" type="date" max="${today}" tabindex="-1" aria-hidden="true">
   <div role="menu" aria-label="Frequent expenses">${picks.map((p, i) => {
     const [x, y] = at(i);
     return `<button class="fq-it" type="button" role="menuitem" data-pick="${i}" style="left:${x}px;top:${y}px;--d:${i * 25}ms"
-      aria-label="Add ${esc(label(p))}, Rp ${formatNum(p.amount)}, for today">${chip(cats.find((c) => c.id === p.categoryId))}<span class="num">${formatNum(p.amount)}</span></button>`;
+      aria-label="${esc(label(p))}, Rp ${formatNum(p.amount)}">${chip(cats.find((c) => c.id === p.categoryId))}<span class="num">${formatNum(p.amount)}</span></button>`;
   }).join('')}</div>
   <button class="fq-x" type="button" aria-label="Close" style="left:${cx}px;top:${cy}px">${icon('plus')}</button>`;
   const tip = root.querySelector('.fq-tip');
   const items = [...root.querySelectorAll('.fq-it')];
+  const picker = root.querySelector('.dt-input');
 
   let active = null;
+  let chosen = null; // the pick waiting for its date
   function select(el) {
-    if (el === active) return;
+    if (el === active || chosen) return;
     active?.classList.remove('on');
     active = el;
     el?.classList.add('on');
@@ -91,15 +96,30 @@ export async function openFrequent({ plus, pointerId }) {
     const p = el && picks[el.dataset.pick];
     tip.innerHTML = p ? `${esc(label(p))}<span class="num">Rp ${formatNum(p.amount)}</span>` : hint;
   }
+  // Keep the pick lit and swap the tip for the day choices.
+  function choose(el) {
+    active?.classList.remove('on');
+    active = el;
+    el.classList.add('on');
+    chosen = picks[el.dataset.pick];
+    root.classList.add('choosing');
+    tip.innerHTML = `${esc(label(chosen))}<span class="num">Rp ${formatNum(chosen.amount)}</span>
+      <span class="fq-when" role="group" aria-label="Add for">
+        <button type="button" data-when="${today}">Today</button>
+        <button type="button" data-when="${yesterday}">Yesterday</button>
+        <button type="button" data-when="" aria-label="Other date">${icon('cal')}</button></span>`;
+    tip.querySelector('[data-when]').focus({ preventScroll: true });
+  }
   const nearest = (x, y) => items.find((el) => Math.hypot(x - parseFloat(el.style.left), y - parseFloat(el.style.top)) <= REACH);
 
-  async function add(p) {
+  async function add(p, date) {
     try {
       const saved = await store.saveExpense({
         amount: p.amount, categoryId: p.categoryId, note: p.note,
-        date: localISO(), time: new Date().toTimeString().slice(0, 5),
+        date, time: new Date().toTimeString().slice(0, 5),
       });
-      toast(`${label(p)} · Rp ${formatNum(p.amount)} added`, {
+      const day = date === today ? '' : date === yesterday ? ' for yesterday' : ` for ${shortDate(date)}`;
+      toast(`${label(p)} · Rp ${formatNum(p.amount)} added${day}`, {
         label: 'Undo', run: () => store.deleteExpense(saved.id).catch((e) => console.error(e)),
       });
     } catch (e) {
@@ -126,24 +146,36 @@ export async function openFrequent({ plus, pointerId }) {
     e.preventDefault();
     close();
   };
-  // The finger that opened the arc: slide to select, lift to add. Lifting on nothing leaves it open.
+  // The finger that opened the arc: slide to select, lift to choose it. Lifting on nothing leaves it open.
   const onMove = (e) => e.pointerId === pointerId && select(nearest(e.clientX, e.clientY));
   const onUp = (e) => {
     if (e.pointerId !== pointerId) return;
     pointerId = undefined;
     eatNextClick();
-    const p = e.type === 'pointerup' && active && picks[active.dataset.pick];
+    const el = e.type === 'pointerup' && active;
     select(null);
-    if (!p) return;
-    close();
-    add(p);
+    if (el) choose(el);
   };
 
+  function addOn(date) {
+    const p = chosen;
+    close();
+    add(p, date);
+  }
   root.addEventListener('click', (ev) => {
+    const when = ev.target.closest('[data-when]');
+    if (when?.dataset.when) return addOn(when.dataset.when);
+    if (when) {
+      picker.value = today;
+      try { picker.showPicker(); } catch { picker.focus(); picker.click(); }
+      return;
+    }
+    if (ev.target.closest('.fq-tip')) return;
     const el = ev.target.closest('[data-pick]');
-    close(); // a pick, × or the dim
-    if (el) add(picks[el.dataset.pick]);
+    if (el) return choose(el);
+    close(); // × or the dim
   });
+  picker.addEventListener('change', () => picker.value && addOn(picker.value));
 
   document.body.append(root);
   history.pushState({ freq: tok }, '');

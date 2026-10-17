@@ -181,6 +181,11 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
   background: var(--surf); color: var(--tx); box-shadow: var(--sh2); font-size: 15px; font-weight: 600; text-align: center; animation: es-fade .2s ease-out;
 }
 .fq-tip .num { margin-left: 8px; color: var(--mu); font-weight: 500; }
+.fq-when { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.fq-when button { min-width: 44px; height: 40px; padding: 0 14px; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: var(--ib); color: var(--tx); font-size: 15px; font-weight: 600; }
+.fq-when button:first-child { background: var(--ac); color: var(--onAc); }
+.fq-when svg { width: 20px; height: 20px; }
+.choosing .fq-it:not(.on) { opacity: .4; }
 .fq-it, .fq-x { position: fixed; z-index: 12; transform: translate(-50%, -50%); }
 .fq-it { display: flex; flex-direction: column; align-items: center; gap: 4px; animation: fq-pop .26s cubic-bezier(.3, 1.4, .5, 1) var(--d) both; }
 @keyframes fq-pop { from { opacity: 0; transform: translate(-50%, -50%) translateY(60px) scale(.4); } }
