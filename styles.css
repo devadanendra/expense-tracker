@@ -235,6 +235,20 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 .es-cs::-webkit-scrollbar { display: none; }
 .es-cs button { flex: none; border-radius: 50%; }
 .es-cs .chip, .gc .chip { --s: 48px; }
+/* Quick add: recent repeats as pills; a tap fills amount, category and note. */
+.es-qp {
+  display: flex; gap: 8px; overflow-x: auto; margin: -4px; padding: 4px 32px 4px 4px;
+  scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+}
+.es-qp::-webkit-scrollbar { display: none; }
+.es-qp button {
+  flex: none; max-width: 220px; height: 44px; padding: 0 14px 0 6px; border-radius: 22px; background: var(--bg2);
+  display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;
+}
+.es-qp button:active { opacity: .6; }
+.es-qp .chip { --s: 32px; }
+.es-qp .qp-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.es-qp .num { color: var(--mu); }
 .es [aria-pressed="true"] > .chip { box-shadow: 0 0 0 2px var(--surf), 0 0 0 4px var(--ac); }
 .fld { position: relative; height: 54px; padding: 0 16px; border-radius: 16px; background: var(--bg2); display: flex; align-items: center; gap: 10px; }
 .fld > svg { width: 20px; height: 20px; color: var(--mu); }

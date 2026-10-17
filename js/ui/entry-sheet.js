@@ -2,6 +2,7 @@ import * as store from '../store.js';
 import { createCalc } from '../calc.js';
 import { formatNum } from '../money.js';
 import { OTHER_ID } from '../categories.js';
+import { quickPicks } from '../stats.js';
 import { icon } from '../icons.js';
 import { esc, chip, localISO, shortDate } from './home.js';
 
@@ -33,8 +34,11 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   if (isOpen) return;
   isOpen = true; // blocks a second tap while categories load
   let cats;
+  let picks = [];
   try {
     cats = await store.liveCategories();
+    if (!expense) picks = quickPicks(await store.liveExpenses(), daysAgo(30))
+      .filter((p) => cats.some((c) => c.id === p.categoryId));
   } finally {
     isOpen = false; // set again at mount, so a throw below never leaves the + button dead
   }
@@ -69,6 +73,11 @@ export async function openEntrySheet({ expense, onDone } = {}) {
       <p class="expr num"></p>
     </div>
     <div class="es-mid">
+      ${picks.length ? `<div class="es-qp" role="group" aria-label="Quick add">${picks.map((p, i) => {
+        const cat = cats.find((c) => c.id === p.categoryId);
+        const label = p.note || cat.name;
+        return `<button type="button" data-pick="${i}" aria-label="${esc(label)}, Rp ${formatNum(p.amount)}">${chip(cat)}<span class="qp-t">${esc(label)}</span><span class="num">${formatNum(p.amount)}</span></button>`;
+      }).join('')}</div>` : ''}
       <div class="es-cat">
         <button class="pill" type="button" data-act="cats" aria-expanded="false"><span></span>${icon('chevron-down')}</button>
         <div class="es-cs" role="group" aria-label="Category">${cats.map((c) =>
@@ -221,12 +230,21 @@ export async function openEntrySheet({ expense, onDone } = {}) {
 
   root.addEventListener('click', (ev) => {
     if (ev.target === panel) return closePanel(); // dimmed sheet around the category card
-    const el = ev.target.closest('[data-act], [data-k], [data-cat], [data-date]');
+    const el = ev.target.closest('[data-act], [data-k], [data-cat], [data-date], [data-pick]');
     if (!el || el.disabled) return;
     // A tap or mouse click hands focus back to the sheet, so physical keys (Enter) keep working.
     if (ev.detail) sheet.focus({ preventScroll: true });
-    const { act, k, cat, date: d } = el.dataset;
+    const { act, k, cat, date: d, pick } = el.dataset;
     if (k) return press(k);
+    if (pick) {
+      // Fills the form; the date stays as picked and ✓ saves, so a pick can still be tweaked.
+      const p = picks[pick];
+      calc.load(p.amount);
+      categoryId = p.categoryId;
+      note.value = p.note;
+      update();
+      return reveal();
+    }
     if (cat) {
       categoryId = cat;
       update();
