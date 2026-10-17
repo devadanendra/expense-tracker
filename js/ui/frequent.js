@@ -22,8 +22,8 @@ export function eatNextClick() {
 }
 
 // Repeated expenses fanned out in an arc over the + button, opened by holding it. Keep the finger
-// down, slide onto one and let go, or let go anywhere and tap one; then pick the day (Today,
-// Yesterday or any date) to add it. A toast offers Undo. × , the dim, Android back and Escape close it. pointerId is the holding
+// down, slide onto one and let go, or let go anywhere and tap one; a menu then asks for the day
+// (Today, Yesterday or any date) and adds it. A toast offers Undo. × , the dim, Android back and Escape close it. pointerId is the holding
 // pointer (none when opened from the keyboard).
 export async function openFrequent({ plus, pointerId }) {
   if (isOpen) return;
@@ -56,6 +56,8 @@ export async function openFrequent({ plus, pointerId }) {
   const tok = Date.now();
   const today = localISO();
   const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return localISO(d); })();
+  const weekday = (iso) => { const d = new Date(`${iso}T12:00`); return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${d.getDate()}`; };
+  const when = (iso, name, ic) => `<button type="button" role="menuitem" data-when="${iso}">${name}<span class="r">${weekday(iso)}</span>${icon(ic)}</button>`;
   const hint = picks.length ? 'Slide or tap to pick one' : 'Expenses you add more than once show up here.';
 
   // Fan from 150° to 30° around the + centre, the most repeated straight above it and the rest
@@ -74,6 +76,7 @@ export async function openFrequent({ plus, pointerId }) {
   root.className = 'fq';
   root.innerHTML = `<div class="fq-dim" aria-hidden="true"></div>
   <div class="fq-tip" aria-live="polite" style="bottom:${innerHeight - cy + RADIUS + 64}px">${hint}</div>
+  <div class="fq-menu" role="menu" aria-label="Add for" hidden></div>
   <input class="dt-input" type="date" max="${today}" tabindex="-1" aria-hidden="true">
   <div role="menu" aria-label="Frequent expenses">${picks.map((p, i) => {
     const [x, y] = at(i);
@@ -84,6 +87,7 @@ export async function openFrequent({ plus, pointerId }) {
   const tip = root.querySelector('.fq-tip');
   const items = [...root.querySelectorAll('.fq-it')];
   const picker = root.querySelector('.dt-input');
+  const menu = root.querySelector('.fq-menu');
 
   let active = null;
   let chosen = null; // the pick waiting for its date
@@ -96,19 +100,19 @@ export async function openFrequent({ plus, pointerId }) {
     const p = el && picks[el.dataset.pick];
     tip.innerHTML = p ? `${esc(label(p))}<span class="num">Rp ${formatNum(p.amount)}</span>` : hint;
   }
-  // Keep the pick lit and swap the tip for the day choices.
+  // Keep the pick lit, blur the rest and open the day menu above it.
   function choose(el) {
     active?.classList.remove('on');
     active = el;
     el.classList.add('on');
     chosen = picks[el.dataset.pick];
     root.classList.add('choosing');
-    tip.innerHTML = `${esc(label(chosen))}<span class="num">Rp ${formatNum(chosen.amount)}</span>
-      <span class="fq-when" role="group" aria-label="Add for">
-        <button type="button" data-when="${today}">Today</button>
-        <button type="button" data-when="${yesterday}">Yesterday</button>
-        <button type="button" data-when="" aria-label="Other date">${icon('cal')}</button></span>`;
-    tip.querySelector('[data-when]').focus({ preventScroll: true });
+    menu.innerHTML = `<p class="fq-mh">Add <b>${esc(label(chosen))} · Rp ${formatNum(chosen.amount)}</b></p>
+      ${when(today, 'Today', 'sun')}${when(yesterday, 'Yesterday', 'history')}
+      <button type="button" role="menuitem" data-when="">Pick a date…${icon('cal')}</button>`;
+    menu.style.bottom = `${innerHeight - parseFloat(el.style.top) + 52}px`;
+    menu.hidden = false;
+    menu.querySelector('[data-when]').focus({ preventScroll: true });
   }
   const nearest = (x, y) => items.find((el) => Math.hypot(x - parseFloat(el.style.left), y - parseFloat(el.style.top)) <= REACH);
 
@@ -170,7 +174,7 @@ export async function openFrequent({ plus, pointerId }) {
       try { picker.showPicker(); } catch { picker.focus(); picker.click(); }
       return;
     }
-    if (ev.target.closest('.fq-tip')) return;
+    if (ev.target.closest('.fq-menu')) return;
     const el = ev.target.closest('[data-pick]');
     if (el) return choose(el);
     close(); // × or the dim
