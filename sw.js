@@ -26,6 +26,7 @@ const SHELL = [
   'js/theme.js',
   'js/ui/categories.js',
   'js/ui/entry-sheet.js',
+  'js/ui/frequent.js',
   'js/ui/home.js',
   'js/ui/reports.js',
   'js/ui/search.js',

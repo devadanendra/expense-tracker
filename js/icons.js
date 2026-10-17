@@ -7,7 +7,6 @@ const PATHS = {
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   note: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   check: '<path d="m5 12 5 5L20 7"/>',
-  history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5"/><path d="M3.5 4v4.5H8"/><path d="M12 7.5V12l3 2"/>',
   back: '<path d="M20 12H8l4-4M8 12l4 4"/>',
   backspace: '<path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7Z"/><path d="m12 9 6 6M18 9l-6 6"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',

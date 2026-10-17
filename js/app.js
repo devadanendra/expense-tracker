@@ -4,6 +4,7 @@ import { SHEET_URL } from './config.js';
 import { createSync } from './sync.js';
 import { renderHome, localISO } from './ui/home.js';
 import { openEntrySheet } from './ui/entry-sheet.js';
+import { openFrequent } from './ui/frequent.js';
 import { renderReports } from './ui/reports.js';
 import { renderSearch } from './ui/search.js';
 import { renderCategories } from './ui/categories.js';
@@ -173,7 +174,31 @@ export async function boot() {
     return;
   }
   await adoptSheetUrl().catch((e) => console.error(e));
-  document.querySelector('.nav .p').addEventListener('click', () => openEntry());
+  // Tap + for the entry sheet; hold it (or the menu key) for Frequent. The tap that ends a hold
+  // only releases it.
+  const plus = document.querySelector('.nav .p');
+  let holdTimer = 0;
+  let held = false;
+  const hold = () => {
+    held = true;
+    navigator.vibrate?.(10);
+    openFrequent({ onNew: () => openEntry() }).catch((e) => console.error(e));
+  };
+  plus.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    held = false;
+    holdTimer = setTimeout(hold, 450);
+  });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) plus.addEventListener(t, () => clearTimeout(holdTimer));
+  plus.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    clearTimeout(holdTimer);
+    hold();
+  });
+  plus.addEventListener('click', () => {
+    if (held) held = false;
+    else openEntry();
+  });
   // Links, tapped or Enter-activated (both fire click). Back/forward still render via hashchange.
   document.addEventListener('click', (ev) => {
     const a = ev.target.closest('a[href^="#/"]');

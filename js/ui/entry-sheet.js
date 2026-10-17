@@ -2,7 +2,6 @@ import * as store from '../store.js';
 import { createCalc } from '../calc.js';
 import { formatNum } from '../money.js';
 import { OTHER_ID } from '../categories.js';
-import { quickPicks } from '../stats.js';
 import { icon } from '../icons.js';
 import { esc, chip, localISO, shortDate } from './home.js';
 
@@ -34,11 +33,8 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   if (isOpen) return;
   isOpen = true; // blocks a second tap while categories load
   let cats;
-  let picks = [];
   try {
     cats = await store.liveCategories();
-    if (!expense) picks = quickPicks(await store.liveExpenses())
-      .filter((p) => cats.some((c) => c.id === p.categoryId));
   } finally {
     isOpen = false; // set again at mount, so a throw below never leaves the + button dead
   }
@@ -66,8 +62,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     <div class="es-head">
       <div class="grab" aria-hidden="true"></div>
       <h2 id="es-title">${expense ? 'Edit expense' : 'New expense'}</h2>
-      ${expense ? '<button class="del" type="button" data-act="delete">Delete</button>'
-        : `<button class="ib hist" type="button" data-act="hist" aria-label="Frequent expenses" aria-expanded="false">${icon('history')}</button>`}
+      ${expense ? '<button class="del" type="button" data-act="delete">Delete</button>' : ''}
     </div>
     <div class="es-amt">
       <p class="amtIn num" aria-live="polite"><span class="rp">Rp</span><span class="v"></span></p>
@@ -95,16 +90,6 @@ export async function openEntrySheet({ expense, onDone } = {}) {
           `<button class="gc" type="button" data-cat="${esc(c.id)}">${chip(c)}<span class="gl">${esc(c.name)}</span></button>`).join('')}</div>
       </div>
     </div>
-    ${expense ? '' : `<div class="cp hp" hidden>
-      <div class="cp-card" role="dialog" aria-modal="true" aria-labelledby="hp-title">
-        <div class="hp-head"><h3 id="hp-title">Frequent</h3><button class="ib" type="button" data-act="unpanel" aria-label="Close">${icon('x')}</button></div>
-        ${picks.length ? picks.map((p, i) => {
-          const cat = cats.find((c) => c.id === p.categoryId);
-          const label = p.note || cat.name;
-          return `<button class="hp-row" type="button" data-pick="${i}" aria-label="${esc(label)}, Rp ${formatNum(p.amount)}, added ${p.count} times">${chip(cat)}<span class="hp-t">${esc(label)}</span><span class="hp-n">${p.count}×</span><span class="num">${formatNum(p.amount)}</span></button>`;
-        }).join('') : '<p class="hp-empty">Expenses you add more than once show up here.</p>'}
-      </div>
-    </div>`}
   </section>`;
 
   const $ = (s) => root.querySelector(s);
@@ -115,8 +100,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   const err = $('.es-err');
   const pill = $('.pill');
   const strip = $('.es-cs');
-  const catPanel = $('.cp:not(.hp)');
-  const histPanel = $('.hp');
+  const panel = $('.cp');
   note.value = expense?.note ?? '';
 
   function update() {
@@ -183,30 +167,20 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     run(() => store.deleteExpense(expense.id), 'delete');
   }
 
-  // Category and Frequent panels: cards over the sheet, each with its own history entry, so
-  // Android back closes the panel, not the sheet. active is the open one ({ el, btn }) or null.
-  let active = null;
-  function showPanel(el, btn) {
-    if ((active?.el ?? null) === (el ?? null)) return;
-    const was = active;
-    if (was) {
-      was.el.hidden = true;
-      was.btn.setAttribute('aria-expanded', false);
-    }
-    active = el ? { el, btn } : null;
-    if (el) {
-      el.hidden = false;
-      btn.setAttribute('aria-expanded', true);
-    }
-    for (const c of sheet.children) if (!c.classList.contains('cp')) c.inert = !!el;
-    (el ? el.querySelector('[aria-pressed="true"], button') ?? el.querySelector('.cp-card') : was.btn).focus();
+  // Category panel: its own history entry, so Android back closes the panel, not the sheet.
+  function showPanel(on) {
+    if (panel.hidden === !on) return;
+    panel.hidden = !on;
+    pill.setAttribute('aria-expanded', on);
+    for (const el of sheet.children) if (el !== panel) el.inert = on;
+    (on ? panel.querySelector('[aria-pressed="true"]') : pill).focus();
   }
-  function openPanel(el, btn) {
-    showPanel(el, btn);
+  function openPanel() {
+    showPanel(true);
     history.pushState({ sheet: tok, panel: 1 }, '');
   }
   function closePanel() {
-    showPanel(null);
+    showPanel(false);
     if (history.state?.sheet === tok && history.state.panel) history.back();
   }
 
@@ -223,16 +197,16 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   }
 
   // Back from the panel's entry lands on the sheet's own: only the panel closes.
-  const onPop = () => (history.state?.sheet === tok ? showPanel(null) : close(true));
+  const onPop = () => (history.state?.sheet === tok ? showPanel(false) : close(true));
 
   function onKey(e) {
     if (e.target === note || e.target === picker || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (!active) close();
+      if (panel.hidden) close();
       else closePanel();
-    } else if (active) {
-      return; // a panel covers the keypad
+    } else if (!panel.hidden) {
+      return; // the category panel covers the keypad
     } else if (e.key === 'Enter') {
       if (e.target.closest?.('button')) return; // keyboard users activating a focused button
       e.preventDefault();
@@ -246,27 +220,17 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   }
 
   root.addEventListener('click', (ev) => {
-    if (ev.target === active?.el) return closePanel(); // dimmed sheet around the panel's card
-    const el = ev.target.closest('[data-act], [data-k], [data-cat], [data-date], [data-pick]');
+    if (ev.target === panel) return closePanel(); // dimmed sheet around the category card
+    const el = ev.target.closest('[data-act], [data-k], [data-cat], [data-date]');
     if (!el || el.disabled) return;
     // A tap or mouse click hands focus back to the sheet, so physical keys (Enter) keep working.
     if (ev.detail) sheet.focus({ preventScroll: true });
-    const { act, k, cat, date: d, pick } = el.dataset;
+    const { act, k, cat, date: d } = el.dataset;
     if (k) return press(k);
-    if (pick) {
-      // Fills the form; the date stays as picked and ✓ saves, so a pick can still be tweaked.
-      const p = picks[pick];
-      calc.load(p.amount);
-      categoryId = p.categoryId;
-      note.value = p.note;
-      update();
-      closePanel();
-      return reveal();
-    }
     if (cat) {
       categoryId = cat;
       update();
-      if (active) closePanel();
+      if (!panel.hidden) closePanel();
       return reveal();
     }
     if (d) date = d;
@@ -274,9 +238,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
       case 'close': return close();
       case 'save': return save();
       case 'delete': return remove();
-      case 'cats': return openPanel(catPanel, pill);
-      case 'hist': return openPanel(histPanel, $('.hist'));
-      case 'unpanel': return closePanel();
+      case 'cats': return openPanel();
       case 'cal':
         picker.value = date;
         try { picker.showPicker(); } catch { picker.focus(); picker.click(); }
