@@ -6,6 +6,7 @@ import { icon } from '../icons.js';
 import { openEntry, startRestore, render } from '../app.js';
 import { installCardVisible, dismissInstallCard } from '../install.js';
 import { install, openPassphrase } from './settings.js';
+import { bindRowHold } from './row-hold.js';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'];
@@ -193,6 +194,7 @@ export async function renderHome(root, state) {
   <section class="body">${body}</section>`;
 
   bindMonth(root, state);
+  bindRowHold(root, (id) => month.find((e) => e.id === id));
   root.addEventListener('click', (ev) => {
     const el = ev.target.closest('[data-act], [data-id]');
     if (!el) return;

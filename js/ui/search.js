@@ -2,6 +2,7 @@ import * as store from '../store.js';
 import { icon } from '../icons.js';
 import { openEntry } from '../app.js';
 import { localISO, dayLabel, esc, catOf, dayGroups } from './home.js';
+import { bindRowHold } from './row-hold.js';
 
 const notice = (title, text) => `<div class="empty">
     <div class="ring">${icon('search')}</div>
@@ -43,6 +44,7 @@ export async function renderSearch(root, state) {
   }
 
   input.addEventListener('input', () => { state.query = input.value; show(); });
+  bindRowHold(body, (id) => expenses.find((e) => e.id === id));
   body.addEventListener('click', (ev) => {
     const el = ev.target.closest('[data-id]');
     if (el) openEntry(expenses.find((e) => e.id === el.dataset.id));
