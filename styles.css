@@ -199,6 +199,7 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 }
 .fq-tip .num { margin-left: 8px; color: var(--mu); font-weight: 500; }
 .choosing .fq-tip, .choosing .fq-it:not(.on) { visibility: hidden; }
+.choosing .fq-it.on { transition: left .32s cubic-bezier(.2, .8, .2, 1); }
 .fq-menu {
   position: fixed; left: 50%; z-index: 13; width: min(280px, calc(100% - 32px)); transform: translateX(-50%); padding: 0 12px; border-radius: 18px;
   background: var(--surf); box-shadow: var(--sh2); animation: fq-menu .2s ease-out;

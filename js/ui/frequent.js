@@ -111,6 +111,7 @@ export async function openFrequent({ plus, pointerId }) {
     menu.innerHTML = `<p class="fq-mh">${esc(label(chosen))}<span class="num">Rp ${formatNum(chosen.amount)}</span></p>
       ${when(today, 'Today', 'sun')}${when(yesterday, 'Yesterday', 'history')}${when('', 'Pick a date…', 'cal', '')}`;
     menu.style.bottom = `${innerHeight - parseFloat(el.style.top) + 52}px`;
+    el.style.left = `${innerWidth / 2}px`; // glide under the centred menu (.choosing transition)
     menu.hidden = false;
     menu.querySelector('[data-when]').focus({ preventScroll: true });
   }
