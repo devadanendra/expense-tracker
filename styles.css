@@ -218,8 +218,9 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 @keyframes fq-pop { from { opacity: 0; transform: translate(-50%, -50%) translateY(60px) scale(.4); } }
 .fq-it .chip { --s: 56px; background: color-mix(in srgb, var(--c) 22%, var(--surf)); box-shadow: var(--sh2); transition: transform .12s ease-out, box-shadow .12s; }
 .fq-it.on .chip, .fq-it:focus-visible .chip { transform: scale(1.2); box-shadow: 0 0 0 3px var(--surf), 0 0 0 6px var(--ac), var(--sh2); }
-.fq-it .num { font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); transition: transform .12s ease-out; }
-.fq-it.on .num, .fq-it:focus-visible .num { transform: translateY(6px); }
+.fq-it .num { font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); transform-origin: 50% 0; transition: transform .12s ease-out; }
+/* Grows with the chip (×1.2) and keeps its 4px gap below the 6px ring: 28×.2 + 6 + ~1. */
+.fq-it.on .num, .fq-it:focus-visible .num { transform: translateY(12px) scale(1.2); }
 .fq-x { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ac); color: var(--onAc); }
 .fq-x svg { width: 22px; height: 22px; stroke-width: 2.2; transform: rotate(45deg); }
 
