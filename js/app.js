@@ -10,8 +10,8 @@ import { renderCategories } from './ui/categories.js';
 import { renderSettings, openPassphrase } from './ui/settings.js';
 
 // Shared UI state. ym is the selected month ('YYYY-MM'), set in boot(); report is the reports
-// segment ('categories' | 'weeks'); query is the search text.
-export const state = { ym: '', restoreDismissed: false, report: 'categories', query: '' };
+// segment ('categories' | 'weeks') and reportCat the category it lists; query is the search text.
+export const state = { ym: '', restoreDismissed: false, report: 'categories', reportCat: null, query: '' };
 
 // Opens the entry sheet (expense undefined = new). The view re-renders itself via store.onChange.
 export function openEntry(expense) {

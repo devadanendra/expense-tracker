@@ -33,10 +33,15 @@ export function byDay(expenses) {
 export function byCategory(expenses) {
   const sums = new Map();
   const all = live(expenses);
-  for (const e of all) sums.set(e.categoryId, (sums.get(e.categoryId) || 0) + e.amount);
+  for (const e of all) {
+    const c = sums.get(e.categoryId) ?? { total: 0, count: 0 };
+    c.total += e.amount;
+    c.count++;
+    sums.set(e.categoryId, c);
+  }
   const grand = total(all);
   return [...sums]
-    .map(([categoryId, t]) => ({ categoryId, total: t, share: grand ? t / grand : 0 }))
+    .map(([categoryId, c]) => ({ categoryId, ...c, share: grand ? c.total / grand : 0 }))
     .sort((a, b) => b.total - a.total);
 }
 
@@ -46,11 +51,13 @@ export function byWeek(expenses, ym) {
   const weeks = [];
   for (let from = 1; from <= last; from += 7) {
     const to = from === 29 ? last : from + 6;
-    weeks.push({ label: `${month} ${from}–${to}`, from, to, total: 0 });
+    weeks.push({ label: `${month} ${from}–${to}`, from, to, total: 0, count: 0 });
   }
   for (const e of inMonth(expenses, ym)) {
     const day = Number(e.date.slice(8, 10));
-    weeks[Math.floor((day - 1) / 7)].total += e.amount;
+    const w = weeks[Math.floor((day - 1) / 7)];
+    w.total += e.amount;
+    w.count++;
   }
   return weeks;
 }
@@ -69,6 +76,37 @@ export function compareToLastMonth(expenses, todayISO) {
     inMonth(expenses, month).filter((e) => e.date <= `${month}-${pad(day)}`),
   );
   return { diff: upTo(ym, d) - upTo(prev, Math.min(d, daysInMonth(prev))) };
+}
+
+// Days of ym seen so far: all of a past month, up to today in the current one, none in a future one.
+function daysElapsed(ym, todayISO) {
+  const thisYm = todayISO.slice(0, 7);
+  if (ym > thisYm) return 0;
+  return ym === thisYm ? Number(todayISO.slice(8, 10)) : daysInMonth(ym);
+}
+
+// The month before ym over the same days, so a month in progress is not compared to a whole one.
+export function lastMonthSoFar(expenses, ym, todayISO) {
+  const prev = prevMonth(ym);
+  const cut = `${prev}-${pad(Math.min(daysElapsed(ym, todayISO), daysInMonth(prev)))}`;
+  return inMonth(expenses, prev).filter((e) => e.date <= cut);
+}
+
+// Headline numbers for the reports tab. projected is the month-end total at the current
+// daily pace, set only for the month in progress; diff is null when last month has nothing to compare.
+export function monthSummary(expenses, ym, todayISO) {
+  const month = inMonth(expenses, ym);
+  const t = total(month);
+  const days = daysElapsed(ym, todayISO);
+  const current = ym === todayISO.slice(0, 7);
+  const before = lastMonthSoFar(expenses, ym, todayISO);
+  return {
+    count: month.length,
+    perDay: days ? Math.round(t / days) : 0,
+    biggest: month.reduce((b, e) => (!b || e.amount > b.amount ? e : b), null),
+    diff: before.length ? t - total(before) : null,
+    projected: current ? Math.round((t / days) * daysInMonth(ym)) : null,
+  };
 }
 
 // Expenses worth re-adding with one tap: each amount + category + note (case and spaces ignored)

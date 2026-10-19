@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   inMonth, total, byDay, byCategory, byWeek, dailyStrip, compareToLastMonth, quickPicks,
+  lastMonthSoFar, monthSummary,
 } from '../js/stats.js';
 import { DEFAULT_CATEGORIES, CATEGORY_COLORS, OTHER_ID } from '../js/categories.js';
 
@@ -172,4 +173,34 @@ test('quickPicks keeps at most n', () => {
   const many = Array.from({ length: 20 }, (_, i) => ex('2026-10-10', `${10 + i}:00`, 1000 * (i % 10 + 1), 'cat-food'));
   assert.equal(quickPicks(many).length, 8);
   assert.deepEqual(quickPicks(many, 2).map((p) => p.amount), [10000, 9000]);
+});
+
+test('byCategory and byWeek count expenses', () => {
+  const oct = inMonth(fixture, '2026-10');
+  assert.deepEqual(byCategory(oct).map((c) => c.count), [1, 3, 1, 1]);
+  assert.deepEqual(byWeek(fixture, '2026-10').map((w) => w.count), [3, 2, 0, 0, 1]);
+});
+
+test('lastMonthSoFar cuts last month at today for the month in progress, keeps all of it otherwise', () => {
+  const ids = (es) => es.map((e) => e.date);
+  assert.deepEqual(ids(lastMonthSoFar(fixture, '2026-10', '2026-10-13')), ['2026-09-03', '2026-09-13']);
+  assert.equal(lastMonthSoFar(fixture, '2026-10', '2026-11-02').length, 3);
+  assert.equal(lastMonthSoFar(fixture, '2026-10', '2026-09-30').length, 0);
+});
+
+test('monthSummary: current month has a pace, a past one does not', () => {
+  const now = monthSummary(fixture, '2026-10', '2026-10-13');
+  assert.equal(now.count, 6);
+  assert.equal(now.perDay, Math.round(475000 / 13));
+  assert.equal(now.projected, Math.round((475000 / 13) * 31));
+  assert.equal(now.diff, 475000 - 100000);
+  assert.equal(now.biggest.amount, 200000);
+
+  const past = monthSummary(fixture, '2026-09', '2026-10-13');
+  assert.equal(past.projected, null);
+  assert.equal(past.perDay, 20000);
+  assert.equal(past.diff, null);
+
+  const future = monthSummary(fixture, '2026-12', '2026-10-13');
+  assert.deepEqual([future.count, future.perDay, future.biggest], [0, 0, null]);
 });

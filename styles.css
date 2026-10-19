@@ -340,12 +340,20 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .seg button { position: relative; flex: 1; height: 38px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--mu); }
 .seg button::after { content: ""; position: absolute; inset: -3px 0; } /* 44px tap target */
 .seg [aria-pressed="true"] { background: var(--surf); color: var(--tx); box-shadow: var(--sh1); }
+.tls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.tl { min-width: 0; padding: 12px 14px; border-radius: 18px; background: var(--surf); box-shadow: var(--sh1); }
+.tv { margin: 2px 0 1px; font-size: 17px; font-weight: 600; white-space: nowrap; }
+.tv .good, .rc-amt .good, .wl .good { color: var(--good); font-weight: 600; }
 .rc { margin-top: 12px; padding: 4px 12px 8px; }
-.rc-row { padding: 9px 0; }
+.rc-row { display: block; width: 100%; padding: 9px 0; text-align: left; }
+.rc-row:active { opacity: .6; }
+.rc-row:focus-visible { outline-offset: 2px; border-radius: 12px; }
 .rc-top { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .rc-top .chip { --s: 28px; }
-.rc-top .t1 { flex: 1; }
-.bar2 { height: 8px; margin-top: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.rc-amt { display: flex; flex-direction: column; align-items: flex-end; }
+.rc-row[aria-expanded="true"] .bar2 { height: 10px; }
+.rc-h { padding-top: 18px; font-size: 14px; color: var(--tx); }
+.bar2 { display: block; height: 8px; margin-top: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .bar2 i { display: block; height: 100%; border-radius: 4px; }
 .wkc { margin-top: 12px; padding: 6px 12px 12px; }
 .wk { display: flex; align-items: flex-end; gap: 10px; height: 110px; padding: 12px 6px 0; }
@@ -357,7 +365,7 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .wl { margin-top: 10px; }
 .sr { display: flex; align-items: center; gap: 11px; min-height: 50px; }
 .sr + .sr { border-top: 1px solid var(--line); }
-.wl .t1 { flex: 1; }
+.wl .sr { padding: 8px 0; }
 
 /* ---------- Search ---------- */
 .qh { padding-top: 14px; }
