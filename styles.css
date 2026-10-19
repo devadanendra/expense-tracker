@@ -340,10 +340,6 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .seg button { position: relative; flex: 1; height: 38px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--mu); }
 .seg button::after { content: ""; position: absolute; inset: -3px 0; } /* 44px tap target */
 .seg [aria-pressed="true"] { background: var(--surf); color: var(--tx); box-shadow: var(--sh1); }
-.tls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-.tl { min-width: 0; padding: 12px 14px; border-radius: 18px; background: var(--surf); box-shadow: var(--sh1); }
-.tv { margin: 2px 0 1px; font-size: 17px; font-weight: 600; white-space: nowrap; }
-.tv .good, .rc-amt .good, .wl .good { color: var(--good); font-weight: 600; }
 .rc { margin-top: 12px; padding: 4px 12px 8px; }
 .rc-row { display: block; width: 100%; padding: 9px 0; text-align: left; }
 .rc-row:active { opacity: .6; }
@@ -355,17 +351,64 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .rc-h { padding-top: 18px; font-size: 14px; color: var(--tx); }
 .bar2 { display: block; height: 8px; margin-top: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .bar2 i { display: block; height: 100%; border-radius: 4px; }
-.wkc { margin-top: 12px; padding: 6px 12px 12px; }
-.wk { display: flex; align-items: flex-end; gap: 10px; height: 110px; padding: 12px 6px 0; }
-.wk div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--mu); white-space: nowrap; }
-.wk i { width: 100%; border-radius: 8px; background: var(--bar); }
-.wk i.f { height: 3px; background: var(--line); }
-.wk .cur { color: var(--tx); font-weight: 600; }
-.wk .cur i { background: var(--ac); }
-.wl { margin-top: 10px; }
 .sr { display: flex; align-items: center; gap: 11px; min-height: 50px; }
 .sr + .sr { border-top: 1px solid var(--line); }
-.wl .sr { padding: 8px 0; }
+
+/* Insights carousel: native scroll-snap; the next card peeks in so it reads as swipeable. */
+.car { margin: 12px -14px 0; }
+.car-t { position: relative; display: flex; gap: 10px; padding: 0 14px 2px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 14px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.car-t::-webkit-scrollbar { display: none; }
+.sl { flex: 0 0 calc(100% - 28px); min-height: 252px; display: flex; flex-direction: column; padding: 14px 16px 12px; border-radius: 18px; background: var(--surf); box-shadow: var(--sh1); scroll-snap-align: start; }
+.sl-t { margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--mu); }
+.sl .lead { font-size: 15px; line-height: 1.4; }
+.sl .lead b { font-weight: 600; }
+.sl .good { color: var(--good); font-weight: 600; }
+.sl .key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--mu); }
+.key i { display: inline-block; width: 14px; margin-right: 5px; vertical-align: middle; border-top: 2px solid var(--ac); }
+.key .k-pv { border-top-style: dashed; border-color: var(--bar); }
+.key .k-pj { border-top-style: dotted; }
+.dots { display: flex; justify-content: center; }
+.dots button { position: relative; width: 22px; height: 28px; }
+.dots button::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 3px; background: var(--bar); transition: width .2s, margin .2s; }
+.dots [aria-current]::after { width: 16px; margin-left: -8px; background: var(--tx); }
+
+.pc { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
+.pc text { font-size: 10px; fill: var(--mu); }
+.pc .ax { stroke: var(--line); }
+.pc .pv { fill: none; stroke: var(--bar); stroke-width: 2; stroke-dasharray: 4 4; }
+.pc .fl { fill: var(--ac); opacity: .1; }
+.pc .nw { fill: none; stroke: var(--ac); stroke-width: 2.5; stroke-linejoin: round; }
+.pc .pj { fill: none; stroke: var(--ac); stroke-width: 2; stroke-dasharray: 1 4; stroke-linecap: round; }
+.pc .dt { fill: var(--ac); stroke: var(--surf); stroke-width: 2; }
+
+.dn { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
+.dn-c { position: relative; flex: 0 0 132px; }
+.dn-c svg { display: block; width: 132px; height: 132px; transform: rotate(-90deg); }
+.dn-c circle { fill: none; stroke-width: 18; }
+.dn-c > span { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--mu); }
+.dn-c b { font-size: 17px; font-weight: 600; color: var(--tx); }
+.dn-l { flex: 1; min-width: 0; list-style: none; font-size: 12px; }
+.dn-l li { display: flex; align-items: center; gap: 7px; min-height: 22px; }
+.dn-l i { width: 8px; height: 8px; flex-shrink: 0; border-radius: 2px; }
+.dn-l .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dn-l .more { color: var(--mu); }
+
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal b { font-size: 10px; font-weight: 500; color: var(--mu); text-align: center; }
+.cal i { height: 26px; padding: 3px 4px; border-radius: 7px; background: var(--line); font-size: 9px; font-style: normal; color: var(--mu); }
+.cal i[style] { color: var(--tx); }
+.cal i.hi { color: var(--onAc); }
+.cal i.t { box-shadow: 0 0 0 1.5px var(--surf), 0 0 0 3px var(--tx); }
+.cal i.f { background: none; outline: 1px dashed var(--line); outline-offset: -1px; }
+.cal i.x { visibility: hidden; }
+
+.bars { display: flex; align-items: flex-end; gap: 8px; margin-top: auto; }
+.bars div { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10px; color: var(--mu); }
+.bars i { width: 100%; border-radius: 6px; background: var(--bar); }
+.bars .st { position: relative; width: 100%; display: flex; align-items: flex-end; }
+.bars .g { position: absolute; bottom: 0; background: none; border: 1.5px dashed var(--ac); }
+.bars .m { color: var(--tx); font-weight: 600; }
+.bars .m i:not(.g) { background: var(--ac); }
 
 /* ---------- Search ---------- */
 .qh { padding-top: 14px; }

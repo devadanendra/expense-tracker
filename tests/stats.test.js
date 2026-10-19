@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  inMonth, total, byDay, byCategory, byWeek, dailyStrip, compareToLastMonth, quickPicks,
-  lastMonthSoFar, monthSummary,
+  inMonth, total, byDay, byCategory, dailyStrip, compareToLastMonth, quickPicks,
+  lastMonthSoFar, monthSummary, weekdayAverages, monthTotals,
 } from '../js/stats.js';
 import { DEFAULT_CATEGORIES, CATEGORY_COLORS, OTHER_ID } from '../js/categories.js';
 
@@ -65,29 +65,6 @@ test('byCategory sorts by total desc with share of total', () => {
 test('byCategory on empty input is empty; share is 0 when total is 0', () => {
   assert.deepEqual(byCategory([]), []);
   assert.deepEqual(byCategory([ex('2026-10-01', '00:00', 1, 'x', { deleted: true })]), []);
-});
-
-test('byWeek: Feb 2026 has 4 buckets', () => {
-  const w = byWeek([ex('2026-02-28', '10:00', 5)], '2026-02');
-  assert.equal(w.length, 4);
-  assert.deepEqual(w.map((b) => b.label), ['Feb 1–7', 'Feb 8–14', 'Feb 15–21', 'Feb 22–28']);
-  assert.equal(w[3].total, 5);
-});
-
-test('byWeek: Oct 2026 has 5 buckets, last ends on 31', () => {
-  const w = byWeek(fixture, '2026-10');
-  assert.equal(w.length, 5);
-  assert.deepEqual(w.map((b) => [b.from, b.to]), [[1, 7], [8, 14], [15, 21], [22, 28], [29, 31]]);
-  assert.equal(w[4].label, 'Oct 29–31');
-  assert.equal(w[0].label, 'Oct 1–7');
-  assert.deepEqual(w.map((b) => b.total), [175000, 230000, 0, 0, 70000]);
-});
-
-test('byWeek: Sep 2026 last bucket ends on 30; leap Feb 2028 gets 29-29', () => {
-  assert.equal(byWeek([], '2026-09')[4].to, 30);
-  const leap = byWeek([], '2028-02');
-  assert.equal(leap.length, 5);
-  assert.equal(leap[4].label, 'Feb 29–29');
 });
 
 test('dailyStrip has one entry per day of the month', () => {
@@ -175,10 +152,8 @@ test('quickPicks keeps at most n', () => {
   assert.deepEqual(quickPicks(many, 2).map((p) => p.amount), [10000, 9000]);
 });
 
-test('byCategory and byWeek count expenses', () => {
-  const oct = inMonth(fixture, '2026-10');
-  assert.deepEqual(byCategory(oct).map((c) => c.count), [1, 3, 1, 1]);
-  assert.deepEqual(byWeek(fixture, '2026-10').map((w) => w.count), [3, 2, 0, 0, 1]);
+test('byCategory counts expenses', () => {
+  assert.deepEqual(byCategory(inMonth(fixture, '2026-10')).map((c) => c.count), [1, 3, 1, 1]);
 });
 
 test('lastMonthSoFar cuts last month at today for the month in progress, keeps all of it otherwise', () => {
@@ -203,4 +178,20 @@ test('monthSummary: current month has a pace, a past one does not', () => {
 
   const future = monthSummary(fixture, '2026-12', '2026-10-13');
   assert.deepEqual([future.count, future.perDay, future.biggest], [0, 0, null]);
+});
+
+test('weekdayAverages averages each weekday over the months ending with ym, up to today', () => {
+  // 2026-10-05 and 2026-10-12 are Mondays; Sep 2026 has 4 Mondays, Oct up to the 13th has 2.
+  const es = [ex('2026-10-05', '09:00', 60000, 'cat-food'), ex('2026-10-12', '09:00', 30000, 'cat-food'), ex('2026-10-20', '09:00', 999, 'cat-food')];
+  const avg = weekdayAverages(es, '2026-10', '2026-10-13', 2);
+  assert.equal(avg.length, 7);
+  assert.equal(avg[0], Math.round(90000 / 6));
+  assert.equal(avg[1], 0);
+});
+
+test('monthTotals lists n months oldest first, empty ones as 0', () => {
+  assert.deepEqual(monthTotals(fixture, '2026-10', 3), [
+    { ym: '2026-08', total: 0 }, { ym: '2026-09', total: 600000 }, { ym: '2026-10', total: 475000 },
+  ]);
+  assert.deepEqual(monthTotals([], '2026-01', 2).map((m) => m.ym), ['2025-12', '2026-01']);
 });

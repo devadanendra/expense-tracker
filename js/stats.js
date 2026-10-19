@@ -45,23 +45,6 @@ export function byCategory(expenses) {
     .sort((a, b) => b.total - a.total);
 }
 
-export function byWeek(expenses, ym) {
-  const month = MONTHS[Number(ym.slice(5, 7)) - 1];
-  const last = daysInMonth(ym);
-  const weeks = [];
-  for (let from = 1; from <= last; from += 7) {
-    const to = from === 29 ? last : from + 6;
-    weeks.push({ label: `${month} ${from}–${to}`, from, to, total: 0, count: 0 });
-  }
-  for (const e of inMonth(expenses, ym)) {
-    const day = Number(e.date.slice(8, 10));
-    const w = weeks[Math.floor((day - 1) / 7)];
-    w.total += e.amount;
-    w.count++;
-  }
-  return weeks;
-}
-
 export function dailyStrip(expenses, ym) {
   const strip = new Array(daysInMonth(ym)).fill(0);
   for (const e of inMonth(expenses, ym)) strip[Number(e.date.slice(8, 10)) - 1] += e.amount;
@@ -107,6 +90,30 @@ export function monthSummary(expenses, ym, todayISO) {
     diff: before.length ? t - total(before) : null,
     projected: current ? Math.round((t / days) * daysInMonth(ym)) : null,
   };
+}
+
+// Average spend per weekday (0 = Monday) over `months` months ending with ym, days after today left out.
+export function weekdayAverages(expenses, ym, todayISO, months = 3) {
+  const sums = new Array(7).fill(0);
+  const days = new Array(7).fill(0);
+  for (let k = 0, m = ym; k < months; k++, m = prevMonth(m)) {
+    dailyStrip(expenses, m).forEach((v, i) => {
+      const iso = `${m}-${pad(i + 1)}`;
+      if (iso > todayISO) return;
+      const [y, mo, d] = iso.split('-').map(Number);
+      const wd = (new Date(Date.UTC(y, mo - 1, d)).getUTCDay() + 6) % 7;
+      sums[wd] += v;
+      days[wd]++;
+    });
+  }
+  return sums.map((t, i) => (days[i] ? Math.round(t / days[i]) : 0));
+}
+
+// Totals of the n months ending with ym, oldest first.
+export function monthTotals(expenses, ym, n = 6) {
+  const out = [];
+  for (let k = 0, m = ym; k < n; k++, m = prevMonth(m)) out.unshift({ ym: m, total: total(inMonth(expenses, m)) });
+  return out;
 }
 
 // Expenses worth re-adding with one tap: each amount + category + note (case and spaces ignored)
