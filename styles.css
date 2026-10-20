@@ -83,6 +83,7 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .ib svg { width: 16px; height: 16px; }
+.ib[aria-pressed="true"] { background-color: var(--ac); color: var(--onAc); }
 
 /* ---------- Home header ---------- */
 .hd { background: var(--hd); padding: 10px 20px 38px; }
@@ -341,8 +342,6 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
 .seg button { position: relative; flex: 1; height: 38px; border-radius: 9px; font-size: 12px; font-weight: 600; color: var(--mu); }
 .seg button::after { content: ""; position: absolute; inset: -3px 0; } /* 44px tap target */
 .seg [aria-pressed="true"] { background: var(--surf); color: var(--tx); box-shadow: var(--sh1); }
-.so { margin: 12px 0 0; }
-.so + .lst { margin-top: 12px; }
 .rc { margin-top: 12px; padding: 4px 12px 8px; }
 .rc-row { display: block; width: 100%; padding: 9px 0; text-align: left; }
 .rc-row:active { opacity: .6; }

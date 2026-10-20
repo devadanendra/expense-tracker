@@ -120,16 +120,22 @@ const installCard = () => `<div class="card install">
 export const dayGroups = (expenses, cats, label) => byDay(expenses).map((g) => `<h2 class="dh"><span>${label(g.date)}</span><span class="num">${formatRp(g.total)}</span></h2>
       <div class="lst">${g.items.map((e) => row(e, cats)).join('')}</div>`).join('');
 
-// Expenses as one list, largest first (ties newest first), each row naming its day: Today, Yesterday, Sun 11 Oct.
-export const largestFirst = (expenses) => [...expenses]
-  .sort((a, b) => b.amount - a.amount || `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+// Expenses by amount, largest first (smallest with asc); ties newest first either way.
+export const byAmount = (expenses, asc = false) => [...expenses]
+  .sort((a, b) => (asc ? a.amount - b.amount : b.amount - a.amount) || `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
 
-const ranked = (expenses, cats, today) => `<div class="lst">${largestFirst(expenses).map((e) => row(e, cats,
-  [e.note && esc(catOf(cats, e.categoryId).name), dayLabel(e.date, today).split(' · ')[0]].filter(Boolean).join(' · '))).join('')}</div>`;
+// One list by amount, each row naming its day: Today, Yesterday, Sun 11 Oct.
+const ranked = (expenses, cats, today, asc) => `<h2 class="dh"><span>${asc ? 'Smallest' : 'Largest'} first</span></h2>
+  <div class="lst">${byAmount(expenses, asc).map((e) => row(e, cats,
+    [e.note && esc(catOf(cats, e.categoryId).name), dayLabel(e.date, today).split(' · ')[0]].filter(Boolean).join(' · '))).join('')}</div>`;
 
-const SORTS = { date: 'Newest', amount: 'Largest' };
-const sortBar = (sort) => `<div class="seg so" role="group" aria-label="Sort">${Object.entries(SORTS).map(([k, label]) =>
-  `<button type="button" data-sort="${k}" aria-pressed="${k === sort}">${label}</button>`).join('')}</div>`;
+// The header sort button steps newest -> largest -> smallest -> newest.
+const SORTS = {
+  date: { next: 'desc', icon: 'sort', label: 'Sort by amount' },
+  desc: { next: 'asc', icon: 'sort-desc', label: 'Sorted largest first. Sort smallest first' },
+  asc: { next: 'date', icon: 'sort-asc', label: 'Sorted smallest first. Sort newest first' },
+};
+const sortButton = (sort) => `<button class="ib" type="button" data-act="sort" aria-label="${SORTS[sort].label}"${sort === 'date' ? '' : ' aria-pressed="true"'}>${icon(SORTS[sort].icon)}</button>`;
 
 export const emptyMonth = () => `<div class="empty">
     <div class="ring">${icon('inbox')}</div>
@@ -193,11 +199,12 @@ export async function renderHome(root, state) {
   const card = restore || nudge;
   // Restore card dismissed ("Start fresh") with expenses on the phone: say they are not backed up.
   const warn = !meta.linked && !restore && all.length ? backupWarning() : '';
-  const list = state.homeSort === 'amount' ? ranked(month, cats, today) : dayGroups(month, cats, (d) => dayLabel(d, today));
-  const body = warn + (month.length ? card + sortBar(state.homeSort) + list : restore || nudge + emptyMonth());
+  const list = state.homeSort === 'date' ? dayGroups(month, cats, (d) => dayLabel(d, today)) : ranked(month, cats, today, state.homeSort === 'asc');
+  const body = warn + (month.length ? card + list : restore || nudge + emptyMonth());
 
   root.innerHTML = `<header class="hd">
     ${monthHeader(ym, total(month), `<div class="acts">
+        ${month.length ? sortButton(state.homeSort) : ''}
         <a class="ib" href="#/search" aria-label="Search">${icon('search')}</a>
         <a class="ib" href="#/settings" aria-label="Settings">${icon('gear')}</a>
       </div>`)}
@@ -209,11 +216,11 @@ export async function renderHome(root, state) {
   bindMonth(root, state);
   bindRowHold(root, (id) => month.find((e) => e.id === id));
   root.addEventListener('click', (ev) => {
-    const el = ev.target.closest('[data-act], [data-id], [data-sort]');
+    const el = ev.target.closest('[data-act], [data-id]');
     if (!el) return;
     if (el.dataset.id) return openEntry(month.find((e) => e.id === el.dataset.id));
-    if (el.dataset.sort) { state.homeSort = el.dataset.sort; return render(); }
     switch (el.dataset.act) {
+      case 'sort': state.homeSort = SORTS[state.homeSort].next; return render();
       case 'restore': return startRestore();
       case 'fresh': state.restoreDismissed = true; return render();
       case 'connect': return openPassphrase('connect');

@@ -10,8 +10,8 @@ import { renderCategories } from './ui/categories.js';
 import { renderSettings, openPassphrase } from './ui/settings.js';
 
 // Shared UI state. ym is the selected month ('YYYY-MM'), set in boot(); reportSlide is the reports
-// insight on show and reportCat the category it lists; homeSort orders transactions ('date' or
-// 'amount'); query is the search text.
+// insight on show and reportCat the category it lists; homeSort orders transactions ('date', or by
+// amount 'desc' / 'asc') until the owner leaves them; query is the search text.
 export const state = { ym: '', restoreDismissed: false, reportSlide: 0, reportCat: null, homeSort: 'date', query: '' };
 
 // Opens the entry sheet (expense undefined = new). The view re-renders itself via store.onChange.
@@ -96,6 +96,7 @@ let uaAnimated = false;
 // (search typing survives store changes); entering a route focuses its [autofocus] element.
 export async function render() {
   const route = page();
+  if (route !== '#/') state.homeSort = 'date';
   const my = ++seq;
   const view = document.createElement('div');
   view.className = 'view';
