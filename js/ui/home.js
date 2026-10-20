@@ -85,11 +85,12 @@ function strip(expenses, ym, today) {
 
 export const catOf = (cats, id) => cats.get(id) ?? FALLBACK_CAT;
 
-function row(e, cats) {
+// sub replaces the category line under the note (largest-first adds the day to it).
+function row(e, cats, sub = e.note ? esc(catOf(cats, e.categoryId).name) : '') {
   const c = catOf(cats, e.categoryId);
   return `<button class="row" type="button" data-id="${esc(e.id)}">
     ${chip(c)}
-    <span class="mid"><span class="t1">${esc(e.note || c.name)}</span>${e.note ? `<span class="t2">${esc(c.name)}</span>` : ''}</span>
+    <span class="mid"><span class="t1">${esc(e.note || c.name)}</span>${sub ? `<span class="t2">${sub}</span>` : ''}</span>
     <span class="amt num">${formatNum(e.amount)}</span>
   </button>`;
 }
@@ -118,6 +119,17 @@ const installCard = () => `<div class="card install">
 // Expenses grouped by day, newest first, as home lists them. label(date) names each day.
 export const dayGroups = (expenses, cats, label) => byDay(expenses).map((g) => `<h2 class="dh"><span>${label(g.date)}</span><span class="num">${formatRp(g.total)}</span></h2>
       <div class="lst">${g.items.map((e) => row(e, cats)).join('')}</div>`).join('');
+
+// Expenses as one list, largest first (ties newest first), each row naming its day: Today, Yesterday, Sun 11 Oct.
+export const largestFirst = (expenses) => [...expenses]
+  .sort((a, b) => b.amount - a.amount || `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+
+const ranked = (expenses, cats, today) => `<div class="lst">${largestFirst(expenses).map((e) => row(e, cats,
+  [e.note && esc(catOf(cats, e.categoryId).name), dayLabel(e.date, today).split(' · ')[0]].filter(Boolean).join(' · '))).join('')}</div>`;
+
+const SORTS = { date: 'Newest', amount: 'Largest' };
+const sortBar = (sort) => `<div class="seg so" role="group" aria-label="Sort">${Object.entries(SORTS).map(([k, label]) =>
+  `<button type="button" data-sort="${k}" aria-pressed="${k === sort}">${label}</button>`).join('')}</div>`;
 
 export const emptyMonth = () => `<div class="empty">
     <div class="ring">${icon('inbox')}</div>
@@ -181,7 +193,8 @@ export async function renderHome(root, state) {
   const card = restore || nudge;
   // Restore card dismissed ("Start fresh") with expenses on the phone: say they are not backed up.
   const warn = !meta.linked && !restore && all.length ? backupWarning() : '';
-  const body = warn + (month.length ? card + dayGroups(month, cats, (d) => dayLabel(d, today)) : restore || nudge + emptyMonth());
+  const list = state.homeSort === 'amount' ? ranked(month, cats, today) : dayGroups(month, cats, (d) => dayLabel(d, today));
+  const body = warn + (month.length ? card + sortBar(state.homeSort) + list : restore || nudge + emptyMonth());
 
   root.innerHTML = `<header class="hd">
     ${monthHeader(ym, total(month), `<div class="acts">
@@ -196,9 +209,10 @@ export async function renderHome(root, state) {
   bindMonth(root, state);
   bindRowHold(root, (id) => month.find((e) => e.id === id));
   root.addEventListener('click', (ev) => {
-    const el = ev.target.closest('[data-act], [data-id]');
+    const el = ev.target.closest('[data-act], [data-id], [data-sort]');
     if (!el) return;
     if (el.dataset.id) return openEntry(month.find((e) => e.id === el.dataset.id));
+    if (el.dataset.sort) { state.homeSort = el.dataset.sort; return render(); }
     switch (el.dataset.act) {
       case 'restore': return startRestore();
       case 'fresh': state.restoreDismissed = true; return render();

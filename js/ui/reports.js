@@ -195,8 +195,9 @@ function standoutCard(all, ym, cats) {
   return { title: 'Stood out', card, detail };
 }
 
-// The insight cards side by side; swipe or tap a dot to move. A copy of the first card after the
-// last lets a swipe past the end land back on the first. Tap a card for its details.
+// The insight cards side by side; swipe or tap a dot to move. A copy of the last card before the
+// first and of the first after the last let a swipe past either end land on the other. Tap a card
+// for its details.
 function carousel(all, month, cats, ym, today, state) {
   const s = monthSummary(all, ym, today);
   const fixed = fixedCosts(all, ym);
@@ -210,7 +211,7 @@ function carousel(all, month, cats, ym, today, state) {
       ${ins.card}
     </div>`;
   const html = `<div class="car" role="region" aria-roledescription="carousel" aria-label="Insights">
-      <div class="car-t">${insights.map((ins, i) => card(ins, i)).join('')}${card(insights[0], 0, true)}</div>
+      <div class="car-t">${card(insights.at(-1), insights.length - 1, true)}${insights.map((ins, i) => card(ins, i)).join('')}${card(insights[0], 0, true)}</div>
       <div class="dots">${insights.map((_, i) => `<button type="button" data-slide="${i}" aria-label="Insight ${i + 1} of ${insights.length}"${i === state.reportSlide ? ' aria-current="true"' : ''}></button>`).join('')}</div>
     </div>`;
   return { html, insights };
@@ -264,13 +265,14 @@ export async function renderReports(root, state) {
   bindMonth(root, state);
   const list = root.querySelector('.body');
   const track = root.querySelector('.car-t');
-  // Scroll offset of card i: the track's left padding is its scroll-padding, so card 0 sits at 0.
-  const offset = (i) => track.children[i].offsetLeft - track.children[0].offsetLeft;
+  // Scroll offset of insight i, at track child i + 1 after the copy of the last card. The track's
+  // left padding is its scroll-padding, so child 0 sits at 0.
+  const offset = (i) => track.children[i + 1].offsetLeft - track.children[0].offsetLeft;
   bindRowHold(list, (id) => month.find((e) => e.id === id));
   list.addEventListener('click', (ev) => {
     const el = ev.target.closest('[data-cat], [data-id], [data-slide], [data-insight]');
     if (!el) return;
-    if (el.dataset.slide) return track.scrollTo({ left: offset(el.dataset.slide), behavior: 'smooth' });
+    if (el.dataset.slide) return track.scrollTo({ left: offset(Number(el.dataset.slide)), behavior: 'smooth' });
     if (el.dataset.id) return openEntry(month.find((e) => e.id === el.dataset.id));
     if (el.dataset.insight) return openDetail(car.insights[el.dataset.insight], month);
     state.reportCat = el.dataset.cat === state.reportCat ? null : el.dataset.cat;
@@ -279,18 +281,29 @@ export async function renderReports(root, state) {
   if (!track) return;
 
   const n = car.insights.length;
-  const at = () => Math.round(track.scrollLeft / offset(1));
-  // A re-render (store change, month step) keeps the slide the owner was on.
-  requestAnimationFrame(() => { track.scrollLeft = offset(state.reportSlide); });
-  // Settled on the copy of the first card: swap in the real one, which looks the same. scrollend,
-  // with a quiet-scroll timer as backup in case it never fires.
+  // Track child on show: 0 is the copy of the last card, n + 1 the copy of the first.
+  const at = () => Math.round(track.scrollLeft / (offset(0) || 1));
+  // A re-render (store change, month step) keeps the slide the owner was on. Set once the track has
+  // a width: a page change swaps the view in a frame or more later.
+  const start = new ResizeObserver(() => {
+    if (!track.clientWidth) return;
+    start.disconnect();
+    track.scrollLeft = offset(state.reportSlide);
+  });
+  start.observe(track);
+  // Settled on a copy: swap in the real card, which looks the same. scrollend, with a quiet-scroll
+  // timer as backup in case it never fires.
   let settle;
-  const wrap = () => { if (at() >= n) track.scrollTo({ left: 0, behavior: 'instant' }); };
+  const wrap = () => {
+    const k = at();
+    if (k <= 0) track.scrollTo({ left: offset(n - 1), behavior: 'instant' });
+    else if (k > n) track.scrollTo({ left: offset(0), behavior: 'instant' });
+  };
   track.addEventListener('scrollend', wrap);
   track.addEventListener('scroll', () => {
     clearTimeout(settle);
     settle = setTimeout(wrap, 150);
-    const i = at() % n;
+    const i = (at() + n - 1) % n;
     if (i === state.reportSlide) return;
     state.reportSlide = i;
     root.querySelectorAll('.dots button').forEach((b, k) => (k === i ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current')));
