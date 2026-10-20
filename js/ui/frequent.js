@@ -59,7 +59,8 @@ export async function openFrequent({ plus, pointerId }) {
   const weekday = (iso) => { const d = new Date(`${iso}T12:00`); return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${d.getDate()}`; };
   const when = (iso, name, ic, day = weekday(iso)) => `<button type="button" role="menuitem" data-when="${iso}">
     <span class="ic">${icon(ic)}</span><span class="t1">${name}</span>${day ? `<span class="t2">${day}</span>` : ''}</button>`;
-  const hint = picks.length ? 'Slide or tap to pick one' : 'Expenses you add more than once show up here.';
+  // The tip names the pick under a sliding finger; at rest it shows only when there is nothing to pick.
+  const hint = picks.length ? '' : 'Expenses you add more than once show up here.';
 
   // Fan from 150° to 30° around the + centre, the most repeated straight above it and the rest
   // alternating outwards (left, right, ...).
@@ -76,7 +77,7 @@ export async function openFrequent({ plus, pointerId }) {
   const root = document.createElement('div');
   root.className = 'fq';
   root.innerHTML = `<div class="fq-dim" aria-hidden="true"></div>
-  <div class="fq-tip" aria-live="polite" style="bottom:${innerHeight - cy + RADIUS + 64}px">${hint}</div>
+  <div class="fq-tip" aria-live="polite" style="bottom:${innerHeight - cy + RADIUS + 64}px"${hint ? '' : ' hidden'}>${hint}</div>
   <div class="fq-menu" role="menu" aria-label="Add for" hidden></div>
   <input class="dt-input" type="date" max="${today}" tabindex="-1" aria-hidden="true">
   <div role="menu" aria-label="Frequent expenses">${picks.map((p, i) => {
@@ -100,6 +101,7 @@ export async function openFrequent({ plus, pointerId }) {
     if (el) navigator.vibrate?.(5);
     const p = el && picks[el.dataset.pick];
     tip.innerHTML = p ? `${esc(label(p))}<span class="num">Rp ${formatNum(p.amount)}</span>` : hint;
+    tip.hidden = !tip.innerHTML;
   }
   // Keep the pick lit, blur the rest and open the day menu above it.
   function choose(el) {

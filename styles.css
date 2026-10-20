@@ -179,11 +179,12 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 /* ---------- Floating capsule nav ---------- */
 .nav {
   position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
-  display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 30px;
+  /* Equal tab columns keep + on the screen's centre line, where the Frequent arc and its tip centre. */
+  display: grid; grid-template-columns: 1fr auto 1fr; width: max-content; align-items: center; gap: 4px; padding: 5px; border-radius: 30px;
   background: var(--nav); box-shadow: var(--sh2);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
 }
-.nav .t { height: 44px; padding: 0 14px; border-radius: 22px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--mu); }
+.nav .t { height: 44px; padding: 0 14px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--mu); }
 .nav .t[aria-current] { background: var(--bg2); color: var(--tx); }
 .nav .p { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ac); color: var(--onAc); }
 .nav .p svg { width: 22px; height: 22px; stroke-width: 2.2; }
