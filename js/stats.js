@@ -33,26 +33,16 @@ export function byDay(expenses) {
 export function byCategory(expenses) {
   const sums = new Map();
   const all = live(expenses);
-  for (const e of all) sums.set(e.categoryId, (sums.get(e.categoryId) || 0) + e.amount);
+  for (const e of all) {
+    const c = sums.get(e.categoryId) ?? { total: 0, count: 0 };
+    c.total += e.amount;
+    c.count++;
+    sums.set(e.categoryId, c);
+  }
   const grand = total(all);
   return [...sums]
-    .map(([categoryId, t]) => ({ categoryId, total: t, share: grand ? t / grand : 0 }))
+    .map(([categoryId, c]) => ({ categoryId, ...c, share: grand ? c.total / grand : 0 }))
     .sort((a, b) => b.total - a.total);
-}
-
-export function byWeek(expenses, ym) {
-  const month = MONTHS[Number(ym.slice(5, 7)) - 1];
-  const last = daysInMonth(ym);
-  const weeks = [];
-  for (let from = 1; from <= last; from += 7) {
-    const to = from === 29 ? last : from + 6;
-    weeks.push({ label: `${month} ${from}–${to}`, from, to, total: 0 });
-  }
-  for (const e of inMonth(expenses, ym)) {
-    const day = Number(e.date.slice(8, 10));
-    weeks[Math.floor((day - 1) / 7)].total += e.amount;
-  }
-  return weeks;
 }
 
 export function dailyStrip(expenses, ym) {
@@ -69,6 +59,159 @@ export function compareToLastMonth(expenses, todayISO) {
     inMonth(expenses, month).filter((e) => e.date <= `${month}-${pad(day)}`),
   );
   return { diff: upTo(ym, d) - upTo(prev, Math.min(d, daysInMonth(prev))) };
+}
+
+// Days of ym seen so far: all of a past month, up to today in the current one, none in a future one.
+function daysElapsed(ym, todayISO) {
+  const thisYm = todayISO.slice(0, 7);
+  if (ym > thisYm) return 0;
+  return ym === thisYm ? Number(todayISO.slice(8, 10)) : daysInMonth(ym);
+}
+
+// The month before ym over the same days, so a month in progress is not compared to a whole one.
+export function lastMonthSoFar(expenses, ym, todayISO) {
+  const prev = prevMonth(ym);
+  const cut = `${prev}-${pad(Math.min(daysElapsed(ym, todayISO), daysInMonth(prev)))}`;
+  return inMonth(expenses, prev).filter((e) => e.date <= cut);
+}
+
+// Headline numbers for the reports tab. projected is the month-end total at the current
+// daily pace, set only for the month in progress; diff is null when last month has nothing to compare.
+export function monthSummary(expenses, ym, todayISO) {
+  const t = total(inMonth(expenses, ym));
+  const days = daysElapsed(ym, todayISO);
+  const current = ym === todayISO.slice(0, 7);
+  const before = lastMonthSoFar(expenses, ym, todayISO);
+  return {
+    perDay: days ? Math.round(t / days) : 0,
+    diff: before.length ? t - total(before) : null,
+    projected: current ? Math.round((t / days) * daysInMonth(ym)) : null,
+  };
+}
+
+// Average spend per weekday (0 = Monday) over `months` months ending with ym, days after today left out.
+export function weekdayAverages(expenses, ym, todayISO, months = 3) {
+  const sums = new Array(7).fill(0);
+  const days = new Array(7).fill(0);
+  for (let k = 0, m = ym; k < months; k++, m = prevMonth(m)) {
+    dailyStrip(expenses, m).forEach((v, i) => {
+      const iso = `${m}-${pad(i + 1)}`;
+      if (iso > todayISO) return;
+      const [y, mo, d] = iso.split('-').map(Number);
+      const wd = (new Date(Date.UTC(y, mo - 1, d)).getUTCDay() + 6) % 7;
+      sums[wd] += v;
+      days[wd]++;
+    });
+  }
+  return sums.map((t, i) => (days[i] ? Math.round(t / days[i]) : 0));
+}
+
+// Average total of the up to n months before ym that have any spending; null when none do.
+export function usualMonth(expenses, ym, n = 3) {
+  const totals = [];
+  for (let k = 0, m = prevMonth(ym); k < n; k++, m = prevMonth(m)) {
+    const t = total(inMonth(expenses, m));
+    if (t) totals.push(t);
+  }
+  return totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
+}
+
+const noteKey = (e) => (e.note ?? '').trim().toLowerCase();
+
+// Bills: expenses whose amount, category and note appear exactly once in ym and in each of the two
+// months before, within 5 days of the same day of the month. A habit bought at the same price (a daily
+// coffee) repeats within a month, and a one-off that happens to match lands on a random day.
+// Returns the set of their ids so other insights can leave them out.
+export function fixedCosts(expenses, ym) {
+  const key = (e) => `${e.amount}|${e.categoryId}|${noteKey(e)}`;
+  const once = (es) => {
+    const seen = new Map();
+    for (const e of es) if (noteKey(e)) seen.set(key(e), seen.has(key(e)) ? null : e);
+    return seen;
+  };
+  const before = [prevMonth(ym), prevMonth(prevMonth(ym))].map((m) => once(inMonth(expenses, m)));
+  const day = (e) => Number(e.date.slice(8, 10));
+  const recurs = ([k, e]) => e && before.every((b) => b.get(k) && Math.abs(day(b.get(k)) - day(e)) <= 5);
+  return new Set([...once(inMonth(expenses, ym))].filter(recurs).map(([, e]) => e.id));
+}
+
+// Last month's bills not yet paid in ym: what the rest of a month in progress still owes.
+export function billsDue(expenses, ym) {
+  const key = (e) => `${e.amount}|${e.categoryId}|${noteKey(e)}`;
+  const paid = new Set(inMonth(expenses, ym).map(key));
+  const prev = prevMonth(ym);
+  const bills = fixedCosts(expenses, prev);
+  return inMonth(expenses, prev).filter((e) => bills.has(e.id) && !paid.has(key(e)));
+}
+
+// Spend by time of day: morning 05–11, afternoon 11–17, evening 17–22, late night 22–05.
+export function timeOfDay(expenses) {
+  const sums = [0, 0, 0, 0];
+  for (const e of live(expenses)) {
+    const h = Number(e.time.slice(0, 2));
+    sums[h < 5 || h >= 22 ? 3 : h < 11 ? 0 : h < 17 ? 1 : 2] += e.amount;
+  }
+  return sums;
+}
+
+// Notes entered more than once (case and spaces ignored), most frequent first, then biggest total.
+// Keeps the latest spelling and category.
+export function topNotes(expenses, n = 4) {
+  const groups = new Map();
+  for (const e of live(expenses)) {
+    const k = noteKey(e);
+    if (!k) continue;
+    const at = `${e.date} ${e.time}`;
+    const g = groups.get(k) ?? { count: 0, total: 0, at: '' };
+    g.count++;
+    g.total += e.amount;
+    if (at >= g.at) Object.assign(g, { at, note: e.note.trim(), categoryId: e.categoryId });
+    groups.set(k, g);
+  }
+  return [...groups.values()]
+    .filter((g) => g.count > 1)
+    .sort((a, b) => b.count - a.count || b.total - a.total)
+    .slice(0, n)
+    .map(({ note, categoryId, count, total: t }) => ({ note, categoryId, count, total: t }));
+}
+
+// Days of ym up to today with nothing spent, plus the longest and the current run of them.
+// spent[i] is false for a no-spend day and null for a day still to come.
+export function noSpendDays(expenses, ym, todayISO) {
+  const elapsed = daysElapsed(ym, todayISO);
+  const spent = dailyStrip(expenses, ym).map((v, i) => (i < elapsed ? v > 0 : null));
+  let best = 0;
+  let run = 0;
+  for (const s of spent.slice(0, elapsed)) {
+    run = s ? 0 : run + 1;
+    best = Math.max(best, run);
+  }
+  return { spent, count: spent.filter((s) => s === false).length, best, current: run };
+}
+
+// The expense in ym furthest above its category's median over the 3 months before it, if at
+// least 3 times that median. Needs 5 earlier expenses in the category to know what is usual.
+// low/high bound the middle half of those earlier amounts.
+export function standout(expenses, ym) {
+  const history = new Map();
+  for (let k = 0, m = prevMonth(ym); k < 3; k++, m = prevMonth(m)) {
+    for (const e of inMonth(expenses, m)) {
+      if (!history.has(e.categoryId)) history.set(e.categoryId, []);
+      history.get(e.categoryId).push(e.amount);
+    }
+  }
+  let best = null;
+  for (const e of inMonth(expenses, ym)) {
+    const past = history.get(e.categoryId);
+    if (!past || past.length < 5) continue;
+    const sorted = [...past].sort((a, b) => a - b);
+    const at = (q) => sorted[Math.floor(q * (sorted.length - 1))];
+    const ratio = e.amount / at(0.5);
+    if (ratio >= 3 && (!best || ratio > best.ratio)) {
+      best = { expense: e, ratio, median: at(0.5), low: at(0.25), high: at(0.75) };
+    }
+  }
+  return best;
 }
 
 // Expenses worth re-adding with one tap: each amount + category + note (case and spaces ignored)
