@@ -125,17 +125,18 @@ export const byAmount = (expenses, asc = false) => [...expenses]
   .sort((a, b) => (asc ? a.amount - b.amount : b.amount - a.amount) || `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
 
 // One list by amount, each row naming its day: Today, Yesterday, Sun 11 Oct.
-const ranked = (expenses, cats, today, asc) => `<h2 class="dh"><span>${asc ? 'Smallest' : 'Largest'} first</span></h2>
-  <div class="lst">${byAmount(expenses, asc).map((e) => row(e, cats,
-    [e.note && esc(catOf(cats, e.categoryId).name), dayLabel(e.date, today).split(' · ')[0]].filter(Boolean).join(' · '))).join('')}</div>`;
+const ranked = (expenses, cats, today, asc) => `<div class="lst">${byAmount(expenses, asc).map((e) => row(e, cats,
+  [e.note && esc(catOf(cats, e.categoryId).name), dayLabel(e.date, today).split(' · ')[0]].filter(Boolean).join(' · '))).join('')}</div>`;
 
-// The header sort button steps newest -> largest -> smallest -> newest.
+// Sort row atop the list: the order on show, and a tap steps newest -> largest -> smallest -> newest.
 const SORTS = {
-  date: { next: 'desc', icon: 'sort', label: 'Sort by amount' },
-  desc: { next: 'asc', icon: 'sort-desc', label: 'Sorted largest first. Sort smallest first' },
-  asc: { next: 'date', icon: 'sort-asc', label: 'Sorted smallest first. Sort newest first' },
+  date: { next: 'desc', icon: 'sort', label: 'Newest first' },
+  desc: { next: 'asc', icon: 'sort-desc', label: 'Largest first' },
+  asc: { next: 'date', icon: 'sort-asc', label: 'Smallest first' },
 };
-const sortButton = (sort) => `<button class="ib" type="button" data-act="sort" aria-label="${SORTS[sort].label}"${sort === 'date' ? '' : ' aria-pressed="true"'}>${icon(SORTS[sort].icon)}</button>`;
+const sortRow = (sort) => `<button class="srt" type="button" data-act="sort" aria-label="${SORTS[sort].label}. Tap for ${SORTS[SORTS[sort].next].label.toLowerCase()}"${sort === 'date' ? '' : ' aria-pressed="true"'}>
+    <span>${SORTS[sort].label}</span><span class="srt-i">${icon(SORTS[sort].icon)}</span>
+  </button>`;
 
 export const emptyMonth = () => `<div class="empty">
     <div class="ring">${icon('inbox')}</div>
@@ -200,11 +201,10 @@ export async function renderHome(root, state) {
   // Restore card dismissed ("Start fresh") with expenses on the phone: say they are not backed up.
   const warn = !meta.linked && !restore && all.length ? backupWarning() : '';
   const list = state.homeSort === 'date' ? dayGroups(month, cats, (d) => dayLabel(d, today)) : ranked(month, cats, today, state.homeSort === 'asc');
-  const body = warn + (month.length ? card + list : restore || nudge + emptyMonth());
+  const body = warn + (month.length ? card + sortRow(state.homeSort) + list : restore || nudge + emptyMonth());
 
   root.innerHTML = `<header class="hd">
     ${monthHeader(ym, total(month), `<div class="acts">
-        ${month.length ? sortButton(state.homeSort) : ''}
         <a class="ib" href="#/search" aria-label="Search">${icon('search')}</a>
         <a class="ib" href="#/settings" aria-label="Settings">${icon('gear')}</a>
       </div>`)}
