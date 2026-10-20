@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   inMonth, total, byDay, byCategory, dailyStrip, compareToLastMonth, quickPicks,
-  lastMonthSoFar, monthSummary, weekdayAverages, usualMonth, fixedCosts, timeOfDay, topNotes,
-  noSpendDays, standout, billsDue,
+  lastMonthSoFar, monthSummary, weekdayAverages, usualMonth, fixedCosts, topNotes,
+  standout, billsDue,
 } from '../js/stats.js';
 import { DEFAULT_CATEGORIES, CATEGORY_COLORS, OTHER_ID } from '../js/categories.js';
 
@@ -213,11 +213,6 @@ test('fixedCosts finds expenses repeated once a month for 3 months with the same
   assert.deepEqual([...fixedCosts(es, '2026-10')], ['bill']);
 });
 
-test('timeOfDay buckets by hour; late night wraps past midnight', () => {
-  const es = ['04:59', '05:00', '10:59', '11:00', '17:00', '21:59', '22:00', '23:30'].map((t) => ex('2026-10-01', t, 1, 'cat-food'));
-  assert.deepEqual(timeOfDay(es), [2, 1, 2, 3]);
-});
-
 test('topNotes groups notes ignoring case and spaces, most frequent first, latest spelling kept', () => {
   const es = [
     ex('2026-10-01', '08:00', 25000, 'cat-food', { note: 'kopi' }),
@@ -233,15 +228,6 @@ test('topNotes groups notes ignoring case and spaces, most frequent first, lates
     { note: 'Kopi', categoryId: 'cat-food', count: 3, total: 80000 },
     { note: 'Gojek', categoryId: 'cat-transport', count: 2, total: 180000 },
   ]);
-});
-
-test('noSpendDays counts empty days up to today with the best and current runs', () => {
-  const es = ['2026-10-01', '2026-10-04', '2026-10-05'].map((d) => ex(d, '09:00', 1, 'cat-food'));
-  const r = noSpendDays(es, '2026-10', '2026-10-08');
-  assert.deepEqual(r.spent.slice(0, 9), [true, false, false, true, true, false, false, false, null]);
-  assert.equal(r.spent.length, 31);
-  assert.deepEqual([r.count, r.best, r.current], [5, 3, 3]);
-  assert.deepEqual(noSpendDays([], '2026-09', '2026-10-08').count, 30);
 });
 
 test('standout picks the expense at least 3x its category median of the 3 earlier months', () => {

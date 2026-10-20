@@ -146,18 +146,6 @@ export function billsDue(expenses, ym) {
   return inMonth(expenses, prev).filter((e) => bills.has(e.id) && !paid.has(key(e)));
 }
 
-// Time-of-day slot of an 'HH:MM' time: 0 morning 05–11, 1 afternoon 11–17, 2 evening 17–22, 3 late night 22–05.
-export function slotOf(time) {
-  const h = Number(time.slice(0, 2));
-  return h < 5 || h >= 22 ? 3 : h < 11 ? 0 : h < 17 ? 1 : 2;
-}
-
-export function timeOfDay(expenses) {
-  const sums = [0, 0, 0, 0];
-  for (const e of live(expenses)) sums[slotOf(e.time)] += e.amount;
-  return sums;
-}
-
 // Notes entered more than once (case and spaces ignored), most frequent first, then biggest total.
 // Keeps the latest spelling and category.
 export function topNotes(expenses, n = 4) {
@@ -177,20 +165,6 @@ export function topNotes(expenses, n = 4) {
     .sort((a, b) => b.count - a.count || b.total - a.total)
     .slice(0, n)
     .map(({ note, categoryId, count, total: t }) => ({ note, categoryId, count, total: t }));
-}
-
-// Days of ym up to today with nothing spent, plus the longest and the current run of them.
-// spent[i] is false for a no-spend day and null for a day still to come.
-export function noSpendDays(expenses, ym, todayISO) {
-  const elapsed = daysElapsed(ym, todayISO);
-  const spent = dailyStrip(expenses, ym).map((v, i) => (i < elapsed ? v > 0 : null));
-  let best = 0;
-  let run = 0;
-  for (const s of spent.slice(0, elapsed)) {
-    run = s ? 0 : run + 1;
-    best = Math.max(best, run);
-  }
-  return { spent, count: spent.filter((s) => s === false).length, best, current: run };
 }
 
 // The expense in ym furthest above its category's median over the 3 months before it, if at

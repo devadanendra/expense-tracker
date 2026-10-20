@@ -1,7 +1,7 @@
 import * as store from '../store.js';
 import {
   inMonth, total, byCategory, dailyStrip, monthSummary, lastMonthSoFar, weekdayAverages, usualMonth, fixedCosts,
-  timeOfDay, topNotes, noSpendDays, standout, billsDue, slotOf,
+  topNotes, standout, billsDue,
 } from '../stats.js';
 import { formatNum, formatRp } from '../money.js';
 import { render, openEntry } from '../app.js';
@@ -17,8 +17,6 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const CHART_W = 320;
 const CHART_H = 120;
 const BAR_MAX = 76; // px height of the tallest weekday bar
-const SLOTS = [['🌅', 'Morning', '05–11'], ['☀️', 'Afternoon', '11–17'], ['🌆', 'Evening', '17–22'], ['🌙', 'Late night', '22–05']];
-const SLOT_WHEN = ['before 11:00', 'between 11:00 and 17:00', 'after 17:00', 'after 22:00'];
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const pct = (share) => `${Math.round(share * 100) || '<1'}%`;
@@ -163,30 +161,6 @@ function weekdays(all, ym, today) {
   return { title: 'Weekdays', card, detail };
 }
 
-function timeCard(month, cats, fixed) {
-  const everyday = month.filter((e) => !fixed.has(e.id));
-  const sums = timeOfDay(everyday);
-  const sum = sums.reduce((a, b) => a + b, 0);
-  if (!sum) return null;
-  const max = Math.max(...sums);
-  const top = sums.indexOf(max);
-  const bars = SLOTS.map(([emoji, name, hours], i) => `<div${i === top ? ' class="m"' : ''}>
-      <span class="e" aria-hidden="true">${emoji}</span><span>${name}<br><span class="t2">${hours}</span></span>
-      <span class="tr" aria-hidden="true"><i style="width:${((sums[i] / max) * 100).toFixed(1)}%"></i></span><span class="p num">${pct(sums[i] / sum)}</span>
-    </div>`).join('');
-  const card = `<p class="lead"><b>${SLOTS[top][1]}s</b> cost the most: ${pct(max / sum)} of your spending happens ${SLOT_WHEN[top]}.</p>
-    <div class="tod">${bars}</div>
-    ${fixed.size ? '<p class="key">Bills left out</p>' : ''}`;
-  const detail = () => rows(SLOTS.map(([emoji, name, hours], i) => {
-    const inSlot = everyday.filter((e) => slotOf(e.time) === i);
-    if (!inSlot.length) return [`${emoji} ${name} <span class="t2">${hours}</span>`, 'Nothing'];
-    const [mostly] = byCategory(inSlot);
-    return [`${emoji} ${name} <span class="t2">${hours}</span>`,
-      `${formatRp(sums[i])}<br><span class="t2">${inSlot.length}× · mostly ${esc(catOf(cats, mostly.categoryId).name)}</span>`];
-  })) + note(`By the time each expense was logged${fixed.size ? ', bills left out' : ''}.`);
-  return { title: 'Time of day', card, detail };
-}
-
 function notesCard(month, cats, ym, today, s) {
   const tops = topNotes(month);
   if (!tops.length) return null;
@@ -197,28 +171,6 @@ function notesCard(month, cats, ym, today, s) {
   const card = `<p class="lead"><b>${esc(first.note)}</b> ${first.count} times, ${formatRp(first.total)}.${pace}</p>${list(tops)}`;
   const detail = () => list(topNotes(month, 10)) + note('Notes you used more than once this month, most often first. Capitals and extra spaces are ignored.');
   return { title: 'Top notes', card, detail };
-}
-
-function noSpend(all, ym, today, fixed) {
-  const prev = shiftMonth(ym, -1);
-  const prevFixed = fixedCosts(all, prev);
-  const r = noSpendDays(all.filter((e) => !fixed.has(e.id)), ym, today);
-  const elapsed = r.spent.filter((d) => d !== null).length;
-  const before = noSpendDays(all.filter((e) => !prevFixed.has(e.id)), prev, today).spent.slice(0, elapsed).filter((d) => d === false).length;
-  const todayIdx = ym === today.slice(0, 7) ? Number(today.slice(8, 10)) - 1 : -1;
-  const dots = r.spent.map((d, i) => `<i class="${d === null ? 'f' : d ? '' : 'z'}${i === todayIdx ? ' t' : ''}"></i>`).join('');
-  const card = `<p class="lead"><b>${plural(r.count, 'day')}</b> without spending. ${monName(prev)} had ${before}${todayIdx >= 0 ? ' by this day' : ''}.</p>
-    <div class="nsd" aria-hidden="true">${dots}</div>
-    <div class="ns-n"><div><b class="num">${r.count}</b>no-spend days</div><div><b class="num">${r.best}</b>best streak</div><div><b class="num">${r.current}</b>current streak</div></div>
-    <p class="key"><span><i class="k-z"></i>No spending</span><span><i class="k-s"></i>Spent</span>${fixed.size ? '<span>Bills don’t count</span>' : ''}</p>`;
-  const earlier = [1, 2, 3].map((k) => shiftMonth(ym, -k)).map((m) => {
-    const bills = fixedCosts(all, m);
-    return [monthTitle(m), plural(noSpendDays(all.filter((e) => !bills.has(e.id)), m, today).count, 'day')];
-  });
-  const detail = () => rows([['No-spend days', r.count], ['Best streak', plural(r.best, 'day')], ['Current streak', plural(r.current, 'day')]])
-    + head('Earlier months') + rows(earlier)
-    + note(`A no-spend day has nothing logged${fixed.size ? ' except bills' : ''}. Days still to come don’t count.`);
-  return { title: 'No-spend days', card, detail };
 }
 
 function standoutCard(all, ym, cats) {
@@ -249,8 +201,8 @@ function carousel(all, month, cats, ym, today, state) {
   const s = monthSummary(all, ym, today);
   const fixed = fixedCosts(all, ym);
   const insights = [
-    pace(all, ym, today, s), safeToSpend(all, month, ym, today, fixed, s), weekdays(all, ym, today), timeCard(month, cats, fixed),
-    notesCard(month, cats, ym, today, s), noSpend(all, ym, today, fixed), standoutCard(all, ym, cats),
+    pace(all, ym, today, s), safeToSpend(all, month, ym, today, fixed, s), weekdays(all, ym, today),
+    notesCard(month, cats, ym, today, s), standoutCard(all, ym, cats),
   ].filter(Boolean);
   state.reportSlide = Math.min(state.reportSlide, insights.length - 1);
   const card = (ins, i, copy) => `<div class="sl" data-insight="${i}"${copy ? ' aria-hidden="true" inert' : ''}>
