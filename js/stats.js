@@ -106,14 +106,16 @@ export function weekdayAverages(expenses, ym, todayISO, months = 3) {
   return sums.map((t, i) => (days[i] ? Math.round(t / days[i]) : 0));
 }
 
-// Average total of the up to n months before ym that have any spending; null when none do.
+// Average total of the up to n months before ym that have any spending, with the months it used
+// (newest first); null when none do.
 export function usualMonth(expenses, ym, n = 3) {
-  const totals = [];
+  const months = [];
   for (let k = 0, m = prevMonth(ym); k < n; k++, m = prevMonth(m)) {
     const t = total(inMonth(expenses, m));
-    if (t) totals.push(t);
+    if (t) months.push({ ym: m, total: t });
   }
-  return totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
+  if (!months.length) return null;
+  return { average: Math.round(months.reduce((a, m) => a + m.total, 0) / months.length), months };
 }
 
 const noteKey = (e) => (e.note ?? '').trim().toLowerCase();
@@ -144,13 +146,15 @@ export function billsDue(expenses, ym) {
   return inMonth(expenses, prev).filter((e) => bills.has(e.id) && !paid.has(key(e)));
 }
 
-// Spend by time of day: morning 05–11, afternoon 11–17, evening 17–22, late night 22–05.
+// Time-of-day slot of an 'HH:MM' time: 0 morning 05–11, 1 afternoon 11–17, 2 evening 17–22, 3 late night 22–05.
+export function slotOf(time) {
+  const h = Number(time.slice(0, 2));
+  return h < 5 || h >= 22 ? 3 : h < 11 ? 0 : h < 17 ? 1 : 2;
+}
+
 export function timeOfDay(expenses) {
   const sums = [0, 0, 0, 0];
-  for (const e of live(expenses)) {
-    const h = Number(e.time.slice(0, 2));
-    sums[h < 5 || h >= 22 ? 3 : h < 11 ? 0 : h < 17 ? 1 : 2] += e.amount;
-  }
+  for (const e of live(expenses)) sums[slotOf(e.time)] += e.amount;
   return sums;
 }
 
@@ -191,7 +195,7 @@ export function noSpendDays(expenses, ym, todayISO) {
 
 // The expense in ym furthest above its category's median over the 3 months before it, if at
 // least 3 times that median. Needs 5 earlier expenses in the category to know what is usual.
-// low/high bound the middle half of those earlier amounts.
+// low/high bound the middle half of those earlier amounts; count is how many there were.
 export function standout(expenses, ym) {
   const history = new Map();
   for (let k = 0, m = prevMonth(ym); k < 3; k++, m = prevMonth(m)) {
@@ -208,7 +212,7 @@ export function standout(expenses, ym) {
     const at = (q) => sorted[Math.floor(q * (sorted.length - 1))];
     const ratio = e.amount / at(0.5);
     if (ratio >= 3 && (!best || ratio > best.ratio)) {
-      best = { expense: e, ratio, median: at(0.5), low: at(0.25), high: at(0.75) };
+      best = { expense: e, ratio, median: at(0.5), low: at(0.25), high: at(0.75), count: sorted.length };
     }
   }
   return best;

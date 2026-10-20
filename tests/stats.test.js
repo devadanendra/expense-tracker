@@ -189,8 +189,11 @@ test('weekdayAverages averages each weekday over the months ending with ym, up t
 });
 
 test('usualMonth averages the months before ym that have spending', () => {
-  assert.equal(usualMonth(fixture, '2026-11'), Math.round((475000 + 600000) / 2));
-  assert.equal(usualMonth(fixture, '2026-10'), 600000);
+  assert.deepEqual(usualMonth(fixture, '2026-11'), {
+    average: Math.round((475000 + 600000) / 2),
+    months: [{ ym: '2026-10', total: 475000 }, { ym: '2026-09', total: 600000 }],
+  });
+  assert.equal(usualMonth(fixture, '2026-10').average, 600000);
   assert.equal(usualMonth(fixture, '2026-09'), null);
 });
 
@@ -247,6 +250,7 @@ test('standout picks the expense at least 3x its category median of the 3 earlie
   const r = standout([...past, big, ex('2026-10-15', '10:00', 150000, 'cat-shopping')], '2026-10');
   assert.equal(r.expense, big);
   assert.equal(r.median, 70000);
+  assert.equal(r.count, 5);
   assert.deepEqual([r.low, r.high], [60000, 80000]);
   assert.equal(standout([...past.slice(0, 4), big], '2026-10'), null, 'too little history');
   assert.equal(standout([...past, ex('2026-10-14', '20:00', 200000, 'cat-shopping')], '2026-10'), null, 'under 3x');

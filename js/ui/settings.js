@@ -92,7 +92,7 @@ export function toast(msg, action) {
 
 // Bottom sheet: a modal <dialog> on <body>, as the category editor, so typed text survives view
 // re-renders. It removes itself on close and puts focus back on the opener's re-rendered twin.
-function openSheet(title, inner) {
+export function openSheet(title, inner) {
   const opener = document.activeElement?.id;
   const dlg = document.createElement('dialog');
   dlg.className = 'ce';
