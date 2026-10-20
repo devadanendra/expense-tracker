@@ -1,19 +1,22 @@
 import * as store from '../store.js';
 import {
-  inMonth, total, byCategory, dailyStrip, monthSummary, lastMonthSoFar, weekdayAverages, monthTotals,
+  inMonth, total, byCategory, dailyStrip, monthSummary, lastMonthSoFar, weekdayAverages, usualMonth, fixedCosts,
+  timeOfDay, topNotes, noSpendDays, standout, billsDue,
 } from '../stats.js';
 import { formatNum, formatRp } from '../money.js';
 import { render, openEntry } from '../app.js';
 import {
   localISO, esc, safeColor, chip, monthHeader, bindMonth, emptyMonth, catOf, monthTitle, shiftMonth,
-  dayGroups, dayLabel,
+  dayGroups, dayLabel, shortDate,
 } from './home.js';
 import { bindRowHold } from './row-hold.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const CHART_W = 320;
 const CHART_H = 120;
-const BAR_MAX = 76; // px height of the tallest weekday or month bar
+const BAR_MAX = 76; // px height of the tallest weekday bar
+const SLOTS = [['🌅', 'Morning', '05–11'], ['☀️', 'Afternoon', '11–17'], ['🌆', 'Evening', '17–22'], ['🌙', 'Late night', '22–05']];
+const SLOT_WHEN = ['before 11:00', 'between 11:00 and 17:00', 'after 17:00', 'after 22:00'];
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const pct = (share) => `${Math.round(share * 100) || '<1'}%`;
@@ -72,43 +75,36 @@ function pace(all, ym, today, s) {
     <p class="key"><span><i class="k-nw"></i>${monName(ym)}</span>${s.diff === null ? '' : `<span><i class="k-pv"></i>${monName(prev)}</span>`}${current ? '<span><i class="k-pj"></i>Pace</span>' : ''}</p>`);
 }
 
-function breakdown(month, cats, s) {
-  const R = 54;
-  const C = 2 * Math.PI * R;
-  const shares = byCategory(month);
-  let off = 0;
-  const arcs = shares.map((c) => {
-    const len = c.share * C;
-    const gap = shares.length > 1 ? 2 : 0;
-    const arc = `<circle r="${R}" cx="64" cy="64" stroke="${safeColor(catOf(cats, c.categoryId).color)}" stroke-dasharray="${Math.max(0, len - gap)} ${C}" stroke-dashoffset="${-off}"/>`;
-    off += len;
-    return arc;
-  }).join('');
-  const legend = shares.slice(0, 5).map((c) => `<li><i style="background:${safeColor(catOf(cats, c.categoryId).color)}"></i><span class="n">${esc(catOf(cats, c.categoryId).name)}</span><span class="num">${pct(c.share)}</span></li>`).join('');
-  const rest = shares.length > 5 ? `<li class="more">+${shares.length - 5} more below</li>` : '';
-  return slide('Breakdown', `<div class="dn">
-      <div class="dn-c"><svg viewBox="0 0 128 128" aria-hidden="true">${arcs}</svg>
-        <span><b class="num">${short(total(month))}</b>${plural(s.count, 'expense')}</span></div>
-      <ul class="dn-l">${legend}${rest}</ul>
-    </div>
-    <p class="key">Biggest: ${formatRp(s.biggest.amount)}${s.biggest.note ? ` · ${esc(s.biggest.note)}` : ''}</p>`);
-}
-
-function calendar(all, ym, today) {
-  const days = dailyStrip(all, ym);
-  const max = Math.max(...days) || 1;
-  const [y, m] = ym.split('-').map(Number);
-  const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Monday first
-  const shade = (v) => `color-mix(in srgb, var(--ac) ${Math.round(14 + (v / max) * 86)}%, var(--line))`;
-  const cells = days.map((v, i) => {
-    const iso = `${ym}-${String(i + 1).padStart(2, '0')}`;
-    if (iso > today) return `<i class="f">${i + 1}</i>`;
-    const cls = [v / max > 0.45 && 'hi', iso === today && 't'].filter(Boolean).join(' ');
-    return `<i${cls ? ` class="${cls}"` : ''}${v ? ` style="background:${shade(v)}"` : ''}>${i + 1}</i>`;
-  }).join('');
-  const busiest = days.indexOf(max);
-  return slide('Calendar', `<div class="cal" aria-hidden="true">${DAYS.map((d) => `<b>${d[0]}</b>`).join('')}${'<i class="x"></i>'.repeat(lead)}${cells}</div>
-    <p class="key">Busiest: ${busiest + 1} ${monName(ym).slice(0, 3)}, ${formatRp(max)}</p>`);
+// Daily budget left against the usual month (average of the last 3); past months say how they ended.
+function safeToSpend(all, month, ym, today, fixed, s) {
+  const usual = usualMonth(all, ym);
+  if (!usual) return '';
+  const spent = total(month);
+  const bills = month.filter((e) => fixed.has(e.id));
+  const billsTotal = total(bills);
+  const current = s.projected !== null;
+  const due = current ? total(billsDue(all, ym)) : 0;
+  const left = usual - spent - due;
+  const dim = dailyStrip(all, ym).length;
+  const daysLeft = dim - Number(today.slice(8, 10)) + 1;
+  const hero = current && left > 0
+    ? `Rp ${formatNum(Math.floor(left / daysLeft / 1000) * 1000)}<small>a day</small>`
+    : `Rp ${formatNum(Math.abs(left))}<small>${left >= 0 ? 'under' : 'over'}</small>`;
+  const sub = current && left > 0
+    ? `for the ${plural(daysLeft, 'day')} left, today included, to stay within your usual month of ${formatRp(usual)}`
+    : `your usual month of ${formatRp(usual)}`;
+  const scale = Math.max(usual, spent + due);
+  const w = (v) => `${((v / scale) * 100).toFixed(2)}%`;
+  const names = [...new Set(bills.map((e) => e.note.trim()))];
+  const billLabel = names.length > 3 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ');
+  return slide('Safe to spend', `<p class="hero num">${hero}</p><p class="sub">${esc(sub)}</p>
+    <div class="bud" aria-hidden="true"><i style="width:${w(billsTotal)};background:var(--tx)"></i><i style="width:${w(spent - billsTotal)};background:var(--ac)"></i>${due ? `<i class="due" style="width:${w(due)}"></i>` : ''}<b style="left:${w(usual)}"></b></div>
+    <div class="bud-l">
+      ${billsTotal ? `<i style="background:var(--tx)"></i><span>Bills (${esc(billLabel)})</span><span class="num">${formatNum(billsTotal)}</span>` : ''}
+      <i style="background:var(--ac)"></i><span>${billsTotal ? 'Everything else' : 'Spent'}</span><span class="num">${formatNum(spent - billsTotal)}</span>
+      ${due ? `<i class="due"></i><span>Bills still to come</span><span class="num">${formatNum(due)}</span>` : ''}
+      <i style="background:var(--line)"></i><span>${left >= 0 ? 'Left of your usual month' : 'Over your usual month'}</span><span class="num">${formatNum(Math.abs(left))}</span>
+    </div>`);
 }
 
 function weekdays(all, ym, today) {
@@ -121,30 +117,71 @@ function weekdays(all, ym, today) {
     <p class="key">Average per day over the last 3 months</p>`);
 }
 
-function months(all, ym, s) {
-  const list = monthTotals(all, ym);
-  const max = Math.max(...list.map((m) => m.total), s.projected ?? 0) || 1;
-  const h = (v) => Math.max(4, Math.round((v / max) * BAR_MAX));
-  const bars = list.map((m) => {
-    const cur = m.ym === ym;
-    const ghost = cur && s.projected ? `<i class="g" style="height:${h(s.projected)}px"></i>` : '';
-    return `<div${cur ? ' class="m"' : ''}><span class="num">${m.total ? short(m.total) : '–'}</span><span class="st">${ghost}<i style="height:${h(m.total)}px"></i></span>${monName(m.ym).slice(0, 3)}</div>`;
-  }).join('');
-  const done = list.filter((m) => m.total && !(m.ym === ym && s.projected !== null)); // a month in progress would drag it down
-  const avg = done.length ? `Average month: ${formatRp(Math.round(done.reduce((t, m) => t + m.total, 0) / done.length))}` : '';
-  return slide('6 months', `<div class="bars" aria-hidden="true">${bars}</div>
-    <p class="key">${avg}</p>`);
+function timeCard(month, fixed) {
+  const sums = timeOfDay(month.filter((e) => !fixed.has(e.id)));
+  const sum = sums.reduce((a, b) => a + b, 0);
+  if (!sum) return '';
+  const max = Math.max(...sums);
+  const top = sums.indexOf(max);
+  const rows = SLOTS.map(([icon, name, hours], i) => `<div${i === top ? ' class="m"' : ''}>
+      <span class="e" aria-hidden="true">${icon}</span><span>${name}<br><span class="t2">${hours}</span></span>
+      <span class="tr" aria-hidden="true"><i style="width:${((sums[i] / max) * 100).toFixed(1)}%"></i></span><span class="p num">${pct(sums[i] / sum)}</span>
+    </div>`).join('');
+  return slide('Time of day', `<p class="lead"><b>${SLOTS[top][1]}s</b> cost the most: ${pct(max / sum)} of your spending happens ${SLOT_WHEN[top]}.</p>
+    <div class="tod">${rows}</div>
+    ${fixed.size ? '<p class="key">Bills left out</p>' : ''}`);
 }
 
-// Pace, breakdown, calendar, weekdays and months, side by side; swipe or tap a dot to move.
-function carousel(all, month, cats, ym, today, at) {
+function notesCard(month, cats, ym, today, s) {
+  const tops = topNotes(month);
+  if (!tops.length) return '';
+  const [first] = tops;
+  const days = s.projected === null ? 0 : Number(today.slice(8, 10));
+  const pace = days ? ` That's about ${formatRp(Math.round((first.total / days) * dailyStrip([], ym).length / 1000) * 1000)} by month end.` : '';
+  const rows = tops.map((g) => `<li>${chip(catOf(cats, g.categoryId))}<span class="mid"><span class="t1">${esc(g.note)}</span><span class="t2">${g.count}× · avg ${formatRp(Math.round(g.total / g.count))}</span></span><span class="amt num">${formatNum(g.total)}</span></li>`).join('');
+  return slide('Top notes', `<p class="lead"><b>${esc(first.note)}</b> ${first.count} times, ${formatRp(first.total)}.${pace}</p>
+    <ul class="tn">${rows}</ul>`);
+}
+
+function noSpend(all, ym, today, fixed) {
+  const prev = shiftMonth(ym, -1);
+  const prevFixed = fixedCosts(all, prev);
+  const r = noSpendDays(all.filter((e) => !fixed.has(e.id)), ym, today);
+  const elapsed = r.spent.filter((d) => d !== null).length;
+  const before = noSpendDays(all.filter((e) => !prevFixed.has(e.id)), prev, today).spent.slice(0, elapsed).filter((d) => d === false).length;
+  const todayIdx = ym === today.slice(0, 7) ? Number(today.slice(8, 10)) - 1 : -1;
+  const dots = r.spent.map((d, i) => `<i class="${d === null ? 'f' : d ? '' : 'z'}${i === todayIdx ? ' t' : ''}"></i>`).join('');
+  return slide('No-spend days', `<p class="lead"><b>${plural(r.count, 'day')}</b> without spending. ${monName(prev)} had ${before}${todayIdx >= 0 ? ' by this day' : ''}.</p>
+    <div class="nsd" aria-hidden="true">${dots}</div>
+    <div class="ns-n"><div><b class="num">${r.count}</b>no-spend days</div><div><b class="num">${r.best}</b>best streak</div><div><b class="num">${r.current}</b>current streak</div></div>
+    <p class="key"><span><i class="k-z"></i>No spending</span><span><i class="k-s"></i>Spent</span>${fixed.size ? '<span>Bills don’t count</span>' : ''}</p>`);
+}
+
+function standoutCard(all, ym, cats) {
+  const r = standout(all, ym);
+  if (!r) return '';
+  const e = r.expense;
+  const c = catOf(cats, e.categoryId);
+  const max = e.amount * 1.06;
+  const at = (v) => `${((v / max) * 100).toFixed(2)}%`;
+  return slide('Stood out', `<p class="lead">One expense was far above your usual ${esc(c.name)}.</p>
+    <button class="odd" type="button" data-id="${esc(e.id)}">${chip(c)}<span class="mid"><span class="t1">${esc(e.note || c.name)}</span><span class="t2">${shortDate(e.date).slice(0, -5)}</span></span><span class="amt num">${formatNum(e.amount)}</span></button>
+    <div class="rng" aria-hidden="true"><b style="left:${at(r.low)};width:${at(r.high - r.low)}"></b><i style="left:${at(e.amount)}"></i></div>
+    <p class="key">Usual ${esc(c.name)}: ${short(r.low)}–${short(r.high)}. This one is ${r.ratio.toFixed(1).replace('.', ',')}× typical.</p>`);
+}
+
+// The insight cards side by side; swipe or tap a dot to move. Cards with nothing to say are left out.
+function carousel(all, month, cats, ym, today, state) {
   const s = monthSummary(all, ym, today);
+  const fixed = fixedCosts(all, ym);
   const slides = [
-    pace(all, ym, today, s), breakdown(month, cats, s), calendar(all, ym, today), weekdays(all, ym, today), months(all, ym, s),
-  ];
+    pace(all, ym, today, s), safeToSpend(all, month, ym, today, fixed, s), weekdays(all, ym, today), timeCard(month, fixed),
+    notesCard(month, cats, ym, today, s), noSpend(all, ym, today, fixed), standoutCard(all, ym, cats),
+  ].filter(Boolean);
+  state.reportSlide = Math.min(state.reportSlide, slides.length - 1);
   return `<div class="car" role="region" aria-roledescription="carousel" aria-label="Insights">
       <div class="car-t">${slides.join('')}</div>
-      <div class="dots">${slides.map((_, i) => `<button type="button" data-slide="${i}" aria-label="Insight ${i + 1} of ${slides.length}"${i === at ? ' aria-current="true"' : ''}></button>`).join('')}</div>
+      <div class="dots">${slides.map((_, i) => `<button type="button" data-slide="${i}" aria-label="Insight ${i + 1} of ${slides.length}"${i === state.reportSlide ? ' aria-current="true"' : ''}></button>`).join('')}</div>
     </div>`;
 }
 
@@ -177,7 +214,7 @@ export async function renderReports(root, state) {
   const month = inMonth(all, ym);
   const cats = new Map(categories.map((c) => [c.id, c]));
 
-  const body = !month.length ? emptyMonth() : carousel(all, month, cats, ym, today, state.reportSlide)
+  const body = !month.length ? emptyMonth() : carousel(all, month, cats, ym, today, state)
     + categoryList(month, cats, lastMonthSoFar(all, ym, today), state.reportCat, today);
 
   root.innerHTML = `<header class="hd rp">${monthHeader(ym, total(month))}</header>

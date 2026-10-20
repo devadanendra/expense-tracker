@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   inMonth, total, byDay, byCategory, dailyStrip, compareToLastMonth, quickPicks,
-  lastMonthSoFar, monthSummary, weekdayAverages, monthTotals,
+  lastMonthSoFar, monthSummary, weekdayAverages, usualMonth, fixedCosts, timeOfDay, topNotes,
+  noSpendDays, standout, billsDue,
 } from '../js/stats.js';
 import { DEFAULT_CATEGORIES, CATEGORY_COLORS, OTHER_ID } from '../js/categories.js';
 
@@ -165,11 +166,9 @@ test('lastMonthSoFar cuts last month at today for the month in progress, keeps a
 
 test('monthSummary: current month has a pace, a past one does not', () => {
   const now = monthSummary(fixture, '2026-10', '2026-10-13');
-  assert.equal(now.count, 6);
   assert.equal(now.perDay, Math.round(475000 / 13));
   assert.equal(now.projected, Math.round((475000 / 13) * 31));
   assert.equal(now.diff, 475000 - 100000);
-  assert.equal(now.biggest.amount, 200000);
 
   const past = monthSummary(fixture, '2026-09', '2026-10-13');
   assert.equal(past.projected, null);
@@ -177,7 +176,7 @@ test('monthSummary: current month has a pace, a past one does not', () => {
   assert.equal(past.diff, null);
 
   const future = monthSummary(fixture, '2026-12', '2026-10-13');
-  assert.deepEqual([future.count, future.perDay, future.biggest], [0, 0, null]);
+  assert.deepEqual([future.perDay, future.projected, future.diff], [0, null, null]);
 });
 
 test('weekdayAverages averages each weekday over the months ending with ym, up to today', () => {
@@ -189,9 +188,76 @@ test('weekdayAverages averages each weekday over the months ending with ym, up t
   assert.equal(avg[1], 0);
 });
 
-test('monthTotals lists n months oldest first, empty ones as 0', () => {
-  assert.deepEqual(monthTotals(fixture, '2026-10', 3), [
-    { ym: '2026-08', total: 0 }, { ym: '2026-09', total: 600000 }, { ym: '2026-10', total: 475000 },
+test('usualMonth averages the months before ym that have spending', () => {
+  assert.equal(usualMonth(fixture, '2026-11'), Math.round((475000 + 600000) / 2));
+  assert.equal(usualMonth(fixture, '2026-10'), 600000);
+  assert.equal(usualMonth(fixture, '2026-09'), null);
+});
+
+test('fixedCosts finds expenses repeated once a month for 3 months with the same amount, category and note', () => {
+  const es = [
+    ex('2026-08-05', '09:00', 450000, 'cat-bills', { note: 'Listrik' }),
+    ex('2026-09-05', '09:00', 450000, 'cat-bills', { note: 'Listrik' }),
+    ex('2026-10-05', '09:00', 450000, 'cat-bills', { id: 'bill', note: ' listrik ' }),
+    ex('2026-09-08', '09:00', 30000, 'cat-food', { note: 'Bakso' }),
+    ex('2026-10-08', '09:00', 30000, 'cat-food', { note: 'Bakso' }),
+    ...['2026-08-02', '2026-09-20', '2026-10-03'].map((d) => ex(d, '09:00', 25000, 'cat-transport', { note: 'Gojek' })),
+    ex('2026-10-06', '09:00', 460000, 'cat-bills', { note: 'Listrik' }),
+    ex('2026-09-07', '09:00', 20000, 'cat-food'),
+    ex('2026-10-07', '09:00', 20000, 'cat-food'),
+    ...['2026-09-01', '2026-10-01', '2026-10-02'].map((d) => ex(d, '08:00', 25000, 'cat-food', { note: 'Kopi' })),
+  ];
+  assert.deepEqual([...fixedCosts(es, '2026-10')], ['bill']);
+});
+
+test('timeOfDay buckets by hour; late night wraps past midnight', () => {
+  const es = ['04:59', '05:00', '10:59', '11:00', '17:00', '21:59', '22:00', '23:30'].map((t) => ex('2026-10-01', t, 1, 'cat-food'));
+  assert.deepEqual(timeOfDay(es), [2, 1, 2, 3]);
+});
+
+test('topNotes groups notes ignoring case and spaces, most frequent first, latest spelling kept', () => {
+  const es = [
+    ex('2026-10-01', '08:00', 25000, 'cat-food', { note: 'kopi' }),
+    ex('2026-10-02', '08:00', 30000, 'cat-food', { note: 'Kopi ' }),
+    ex('2026-10-03', '08:00', 25000, 'cat-food', { note: 'Kopi' }),
+    ex('2026-10-01', '12:00', 90000, 'cat-transport', { note: 'Gojek' }),
+    ex('2026-10-02', '12:00', 90000, 'cat-transport', { note: 'Gojek' }),
+    ex('2026-10-03', '12:00', 500000, 'cat-shopping', { note: 'Once' }),
+    ex('2026-10-04', '12:00', 9000, 'cat-food'),
+    ex('2026-10-05', '12:00', 9000, 'cat-food'),
+  ];
+  assert.deepEqual(topNotes(es), [
+    { note: 'Kopi', categoryId: 'cat-food', count: 3, total: 80000 },
+    { note: 'Gojek', categoryId: 'cat-transport', count: 2, total: 180000 },
   ]);
-  assert.deepEqual(monthTotals([], '2026-01', 2).map((m) => m.ym), ['2025-12', '2026-01']);
+});
+
+test('noSpendDays counts empty days up to today with the best and current runs', () => {
+  const es = ['2026-10-01', '2026-10-04', '2026-10-05'].map((d) => ex(d, '09:00', 1, 'cat-food'));
+  const r = noSpendDays(es, '2026-10', '2026-10-08');
+  assert.deepEqual(r.spent.slice(0, 9), [true, false, false, true, true, false, false, false, null]);
+  assert.equal(r.spent.length, 31);
+  assert.deepEqual([r.count, r.best, r.current], [5, 3, 3]);
+  assert.deepEqual(noSpendDays([], '2026-09', '2026-10-08').count, 30);
+});
+
+test('standout picks the expense at least 3x its category median of the 3 earlier months', () => {
+  const past = [50, 60, 70, 80, 100].map((k, i) => ex(`2026-0${7 + (i % 3)}-1${i}`, '10:00', k * 1000, 'cat-shopping'));
+  const big = ex('2026-10-14', '20:00', 640000, 'cat-shopping', { note: 'Sneakers' });
+  const r = standout([...past, big, ex('2026-10-15', '10:00', 150000, 'cat-shopping')], '2026-10');
+  assert.equal(r.expense, big);
+  assert.equal(r.median, 70000);
+  assert.deepEqual([r.low, r.high], [60000, 80000]);
+  assert.equal(standout([...past.slice(0, 4), big], '2026-10'), null, 'too little history');
+  assert.equal(standout([...past, ex('2026-10-14', '20:00', 200000, 'cat-shopping')], '2026-10'), null, 'under 3x');
+});
+
+test('billsDue lists bills from last month not yet repeated this month', () => {
+  const bill = (d, amount, note) => ex(d, '09:00', amount, 'cat-bills', { note });
+  const es = [
+    ...['2026-07-05', '2026-08-05', '2026-09-05', '2026-10-05'].map((d) => bill(d, 450000, 'Listrik')),
+    ...['2026-07-25', '2026-08-25'].map((d) => bill(d, 300000, 'Kos')),
+    bill('2026-09-25', 300000, 'Kos'),
+  ];
+  assert.deepEqual(billsDue(es, '2026-10').map((e) => e.note), ['Kos']);
 });
