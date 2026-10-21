@@ -116,6 +116,15 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 }
 .dh { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--mu); padding: 14px 4px 6px; }
 .lst { background: var(--surf); border-radius: 18px; padding: 0 12px; box-shadow: var(--sh1); }
+/* Sort row atop the transactions: order on the left, icon on the right; the whole row is the 44px target. */
+.srt { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; margin-top: 6px; padding: 0 0 0 4px; font-size: 12px; font-weight: 600; color: var(--mu); text-align: left; }
+.srt-i { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--ib); color: var(--tx); }
+.srt-i svg { width: 16px; height: 16px; }
+.srt[aria-pressed="true"] { color: var(--tx); }
+.srt[aria-pressed="true"] .srt-i { background: var(--ac); color: var(--onAc); }
+.srt:active .srt-i { opacity: .6; }
+.srt + .dh { padding-top: 2px; }
+.srt + .lst { margin-top: 4px; }
 .row { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 56px; text-align: left; }
 .row + .row { border-top: 1px solid var(--line); }
 .row:active { opacity: .6; }

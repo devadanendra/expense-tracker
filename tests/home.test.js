@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { localISO, shiftMonth, monthTitle, dayLabel, shortDate } from '../js/ui/home.js';
+import { localISO, shiftMonth, monthTitle, dayLabel, shortDate, byAmount } from '../js/ui/home.js';
 
 test('localISO uses local date fields, not UTC', () => {
   assert.equal(localISO(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
@@ -39,4 +39,11 @@ test('dayLabel: withYear adds the year to older days only', () => {
 test('shortDate: day, short month, year', () => {
   assert.equal(shortDate('2026-10-16'), '16 Oct 2026');
   assert.equal(shortDate('2027-01-05'), '5 Jan 2027');
+});
+
+test('byAmount: largest or smallest first, ties newest first', () => {
+  const e = (id, amount, date, time = '12:00') => ({ id, amount, date, time });
+  const list = [e('a', 5000, '2026-10-01'), e('b', 90000, '2026-10-02'), e('c', 5000, '2026-10-03'), e('d', 5000, '2026-10-03', '18:00')];
+  assert.deepEqual(byAmount(list).map((x) => x.id), ['b', 'd', 'c', 'a']);
+  assert.deepEqual(byAmount(list, true).map((x) => x.id), ['d', 'c', 'a', 'b']);
 });
