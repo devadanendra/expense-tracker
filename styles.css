@@ -466,8 +466,11 @@ label.fld:focus-within { outline: 2px solid var(--ac); outline-offset: 2px; }
   position: fixed; inset: auto 0 0; width: 100%; max-width: 480px; max-height: calc(100% - 16px); margin: 0 auto; padding: 0;
   border: 0; border-radius: 24px 24px 0 0; background: var(--surf); color: var(--tx);
   overflow-y: auto; overscroll-behavior: contain; animation: es-up .24s ease-out;
+  transition: transform .24s cubic-bezier(.2, .9, .3, 1.1);
 }
-.ce::backdrop { background: rgba(20, 18, 16, .38); }
+.ce.drag { transition: none; }
+.ce .grab, .ce .sh { touch-action: none; -webkit-user-select: none; user-select: none; } /* drag-to-close region */
+.ce::backdrop { background: rgba(20, 18, 16, calc(.38 * var(--bd, 1))); }
 .ce:focus { outline: none; }
 .ce-f { padding: 8px 14px calc(14px + env(safe-area-inset-bottom)); }
 .ce-lbl { padding: 14px 4px 4px; font-size: 12px; font-weight: 600; color: var(--mu); }

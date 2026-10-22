@@ -114,7 +114,52 @@ export function openSheet(title, inner) {
   });
   document.body.append(dlg);
   dlg.showModal();
+  dragToClose(dlg);
   return dlg;
+}
+
+const CLOSE_DRAG = 0.25; // share of the sheet's height a drag must pass to close it
+const FLING = 0.5; // px/ms downward that closes it anyway
+
+// Drag down to close, from the grabber and title row only (the rest scrolls or holds inputs), as
+// the entry sheet does: the sheet follows the finger and the backdrop fades with it; on release it
+// closes past CLOSE_DRAG of its height or on a downward fling, else springs back.
+function dragToClose(dlg) {
+  let drag = null;
+  const follow = (dy) => {
+    dlg.style.transform = dy ? `translateY(${dy}px)` : '';
+    dlg.style.setProperty('--bd', dy ? Math.max(0, 1 - dy / dlg.offsetHeight) : '');
+  };
+  dlg.addEventListener('pointerdown', (e) => {
+    if (drag || !e.isPrimary || e.button > 0 || !e.target.closest('.grab, .sh') || e.target.closest('button')) return;
+    drag = { id: e.pointerId, y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
+    dlg.setPointerCapture(e.pointerId);
+    dlg.classList.add('drag');
+  });
+  // Only the dragging pointer counts.
+  dlg.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (e.timeStamp > drag.t) drag.v = (e.clientY - drag.y) / (e.timeStamp - drag.t);
+    drag.y = e.clientY;
+    drag.t = e.timeStamp;
+    follow(Math.max(0, e.clientY - drag.y0));
+  });
+  const release = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = Math.max(0, e.clientY - drag.y0);
+    // A fling needs a recent fast move and some distance, so a tap's jitter never closes.
+    const fling = drag.v > FLING && e.timeStamp - drag.t < 100 && dy > 16;
+    drag = null;
+    dlg.classList.remove('drag');
+    if (e.type === 'pointerup' && (dy > dlg.offsetHeight * CLOSE_DRAG || fling)) {
+      follow(dlg.offsetHeight);
+      setTimeout(() => dlg.close(), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200);
+    } else {
+      follow(0);
+    }
+  };
+  dlg.addEventListener('pointerup', release);
+  dlg.addEventListener('pointercancel', release);
 }
 
 // Error line inside the sheet, or a toast if the owner already closed it: never swallowed.
