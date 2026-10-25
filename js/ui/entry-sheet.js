@@ -20,6 +20,7 @@ const PAD = ['AC', '×', '÷', 'back', '7', '8', '9', '-', '4', '5', '6', '+', '
 
 const CLOSE_DRAG = 0.25; // share of the sheet's height a drag must pass to close it
 const FLING = 0.5; // px/ms downward that closes it anyway
+const DRAG_SLOP = 8; // px a touch off the grabber must move down before it is a drag
 
 const nowHHMM = () => new Date().toTimeString().slice(0, 5);
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return localISO(d); };
@@ -102,6 +103,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   const pill = $('.pill');
   const strip = $('.es-cs');
   const panel = $('.cp');
+  const mid = $('.es-mid');
   note.value = expense?.note ?? '';
 
   function update() {
@@ -253,35 +255,64 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     update();
   });
 
-  // Drag down to close, from the grabber, title and amount only (never the keypad, strip or
-  // inputs). The sheet follows the finger and the scrim fades with it; on release it closes
-  // past CLOSE_DRAG of its height or on a downward fling, else springs back (CSS transition;
-  // prefers-reduced-motion makes both instant).
+  // Drag down to close, from anywhere on the sheet but the note field and the category panel. The
+  // sheet follows the finger and the scrim fades with it; on release it closes past CLOSE_DRAG of
+  // its height or on a downward fling, else springs back (CSS transition; prefers-reduced-motion
+  // makes both instant). The grabber, title and amount start at once; elsewhere (keys, rows, the
+  // category strip) a touch only becomes a drag after DRAG_SLOP px of mostly-downward movement, so
+  // taps and the strip's sideways scroll are left alone.
   let drag = null;
+  let hold = null; // a touch that has not yet moved enough to be a drag
   function follow(dy) {
     sheet.style.transform = dy ? `translateY(${dy}px)` : '';
     scrim.style.opacity = dy ? Math.max(0, 1 - dy / sheet.offsetHeight) : '';
   }
-  sheet.addEventListener('pointerdown', (e) => {
-    if (drag || busy || !e.isPrimary || e.button > 0 || !e.target.closest('.es-head, .es-amt') || e.target.closest('button')) return;
-    drag = { id: e.pointerId, y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
+  function grab(e, y0) {
+    drag = { id: e.pointerId, y0, y: e.clientY, t: e.timeStamp, v: 0 };
     sheet.setPointerCapture(e.pointerId);
     root.classList.add('drag');
+  }
+  sheet.addEventListener('pointerdown', (e) => {
+    if (drag || busy || !e.isPrimary || e.button > 0 || e.target.closest('input, .cp')) return;
+    // The middle scrolls on a short screen; there a touch scrolls it instead (see fit below).
+    if (mid.classList.contains('scrolls') && e.target.closest('.es-mid')) return;
+    if (e.target.closest('.es-head, .es-amt') && !e.target.closest('button')) grab(e, e.clientY);
+    else hold = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
   });
   // Only the dragging pointer counts: a second finger tapping a key must not end the drag.
   sheet.addEventListener('pointermove', (e) => {
+    if (hold && e.pointerId === hold.id) {
+      const dx = Math.abs(e.clientX - hold.x0);
+      const dy = e.clientY - hold.y0;
+      if (dy > DRAG_SLOP && dy > dx) {
+        grab(e, hold.y0 + DRAG_SLOP); // start from where it was recognised, so the sheet does not jump
+        hold = null;
+      } else if (dx > DRAG_SLOP || dy < -DRAG_SLOP) {
+        hold = null; // sideways or upward: not ours
+      }
+    }
     if (!drag || e.pointerId !== drag.id) return;
     if (e.timeStamp > drag.t) drag.v = (e.clientY - drag.y) / (e.timeStamp - drag.t);
     drag.y = e.clientY;
     drag.t = e.timeStamp;
     follow(Math.max(0, e.clientY - drag.y0));
   });
+  // The click that ends a drag started on a key must not press it.
+  let dragged = false;
+  sheet.addEventListener('click', (e) => {
+    if (!dragged) return;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
   function release(e) {
+    if (hold && e.pointerId === hold.id) hold = null;
     if (!drag || e.pointerId !== drag.id) return;
     const dy = Math.max(0, e.clientY - drag.y0);
     // A fling needs a recent fast move and some distance, so a tap's jitter never closes.
     const fling = drag.v > FLING && e.timeStamp - drag.t < 100 && dy > 16;
     drag = null;
+    dragged = true;
+    setTimeout(() => { dragged = false; }, 0);
     root.classList.remove('drag');
     if (e.type === 'pointerup' && (dy > sheet.offsetHeight * CLOSE_DRAG || fling)) {
       follow(sheet.offsetHeight);
@@ -292,6 +323,9 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   }
   sheet.addEventListener('pointerup', release);
   sheet.addEventListener('pointercancel', release);
+
+  // On a short screen the middle scrolls: it then keeps its own vertical touch (CSS .scrolls).
+  new ResizeObserver(() => mid.classList.toggle('scrolls', mid.scrollHeight > mid.clientHeight + 1)).observe(mid);
 
   update();
   isOpen = true;

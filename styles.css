@@ -278,7 +278,12 @@ svg.i { width: 18px; height: 18px; flex-shrink: 0; }
 /* Screen-reader / keyboard close (the scrim is pointer-only); shows only when focused. */
 .vh { position: absolute; top: 8px; right: 16px; z-index: 1; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .vh:focus-visible { width: auto; height: 36px; padding: 0 14px; clip-path: none; border-radius: 18px; background: var(--bg2); font-weight: 600; }
-.es-head, .es-amt { touch-action: none; -webkit-user-select: none; user-select: none; } /* drag-to-close region */
+.es .sheet { touch-action: none; -webkit-user-select: none; user-select: none; } /* drag-to-close anywhere, see entry-sheet.js */
+.es .sheet .es-note { -webkit-user-select: text; user-select: text; }
+.es .sheet .es-cs { touch-action: pan-x; } /* sideways scrolls the strip; downward drags the sheet */
+.es .sheet > .es-mid { touch-action: none; } /* a scroll container: does not inherit the sheet's */
+.es .sheet > .es-mid.scrolls { touch-action: pan-y; }
+.es .sheet .cp { touch-action: auto; }
 .es-head { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .es-head .grab { margin: 0 0 2px; }
 .es-head h2 { font-size: 18px; font-weight: 600; line-height: 22px; }
