@@ -187,3 +187,52 @@ test('unknown keys are ignored', () => {
   const c = run(['5', 'x', '', '=', '.']);
   assert.equal(c.expression(), '5');
 });
+
+test('tapping a digit puts the caret after it and Backspace removes that digit', () => {
+  const c = run(['1', '2', '0', '0', '0']);
+  c.setCaret(2); // after the "2"
+  c.press('back');
+  assert.equal(c.value(), 1000);
+  assert.equal(c.caret(), 1);
+});
+
+test('typing at the caret inserts in the middle', () => {
+  const c = run(['1', '0', '0']);
+  c.setCaret(1);
+  c.press('5');
+  assert.equal(c.value(), 1500);
+  assert.equal(c.caret(), 2);
+});
+
+test('caret at the end is plain typing; deleting to the start keeps working', () => {
+  const c = run(['1', '2']);
+  c.setCaret(2);
+  assert.equal(c.caret(), null);
+  c.setCaret(1);
+  c.press('back');
+  assert.equal(c.value(), 2);
+  assert.equal(c.caret(), 0);
+  c.press('back');
+  assert.equal(c.value(), 2);
+});
+
+test('editing inside an expression re-tokenizes it', () => {
+  const c = run(['5', '+', '3', '+', '2']);
+  c.setCaret(3); // after the "3"
+  c.press('back');
+  assert.equal(c.expression(), '5 + 2');
+  assert.equal(c.value(), 7);
+  const z = run(['1', '0']);
+  z.setCaret(1);
+  z.press('back');
+  assert.equal(z.value(), 0);
+  z.press('7'); // caret is at the start, so the 7 goes before the 0
+  assert.equal(z.value(), 70);
+});
+
+test('chars maps each shown char to its caret position', () => {
+  const c = run(['1', '2', '0', '0', '0']);
+  const cs = c.chars();
+  assert.equal(cs.map((x) => x.ch).join(''), '12.000');
+  assert.deepEqual(cs.map((x) => x.pos), [1, 2, 2, 3, 4, 5]);
+});

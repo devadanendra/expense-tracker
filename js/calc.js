@@ -28,8 +28,40 @@ function evaluate(tokens) {
   return Number.isFinite(sum) ? Math.round(sum) + 0 : null;
 }
 
+// Rebuild tokens from raw text after a mid-expression edit, applying the same rules as typing:
+// no leading op, one op between numbers (the later wins), no leading zeros, MAX_DIGITS per number.
+// Returns the tokens and where the caret lands (count of kept chars that were before it).
+function sanitize(raw, caret) {
+  const out = []; // { ch, at } per kept char
+  const curStart = () => {
+    let i = out.length;
+    while (i > 0 && !OPS.includes(out[i - 1].ch)) i--;
+    return i;
+  };
+  [...raw].forEach((ch, at) => {
+    if (OPS.includes(ch)) {
+      if (!out.length) return;
+      if (OPS.includes(out.at(-1).ch)) out.pop();
+      out.push({ ch, at });
+      return;
+    }
+    const from = curStart();
+    const len = out.length - from;
+    if (len >= MAX_DIGITS) return;
+    if (len === 1 && out[from].ch === '0') out.pop(); // '05' is '5'; '00' is '0' (the new 0 re-adds)
+    out.push({ ch, at });
+  });
+  const tokens = [];
+  for (const { ch } of out) {
+    if (OPS.includes(ch) || !tokens.length || OPS.includes(tokens.at(-1))) tokens.push(ch);
+    else tokens[tokens.length - 1] += ch;
+  }
+  return { tokens, caret: out.filter((c) => c.at < caret).length };
+}
+
 export function createCalc() {
   let tokens = [];
+  let caret = null; // null: typing at the end; else the number of raw chars before the cursor
 
   function pressDigits(key) {
     const last = tokens.at(-1);
@@ -42,9 +74,25 @@ export function createCalc() {
     else tokens[tokens.length - 1] = cur + digits.slice(0, MAX_DIGITS - cur.length);
   }
 
+  const raw = () => tokens.join('');
+
+  // Edit in the middle: insert `text` at the caret, or delete the char before it (text '').
+  function editAt(text) {
+    const r = raw();
+    const from = text ? caret : caret - 1;
+    if (from < 0) return;
+    const next = r.slice(0, from) + text + r.slice(caret);
+    ({ tokens, caret } = sanitize(next, from + text.length));
+    if (caret >= raw().length) caret = null;
+  }
+
   function press(key) {
-    if (key === 'AC') tokens = [];
-    else if (key === 'back') {
+    if (key === 'AC') {
+      tokens = [];
+      caret = null;
+    } else if (caret !== null && (key === 'back' || OPS.includes(key) || /^\d$/.test(key) || key === '000')) {
+      editAt(key === 'back' ? '' : key);
+    } else if (key === 'back') {
       const last = tokens.at(-1);
       if (last === undefined) return;
       if (OPS.includes(last) || last.length === 1) tokens.pop();
@@ -70,9 +118,37 @@ export function createCalc() {
     },
     reset() {
       tokens = [];
+      caret = null;
     },
     load(n) {
       tokens = [String(Math.round(n))];
+      caret = null;
+    },
+    // The expression char by char for tapping: pos is the caret value after that char. sep marks
+    // the thousands dots, which show but never hold the caret.
+    chars() {
+      const out = [];
+      let pos = 0;
+      for (const t of tokens) {
+        if (OPS.includes(t)) {
+          out.push({ ch: t, pos: ++pos, op: true });
+          continue;
+        }
+        let digits = 0;
+        for (const ch of formatNum(Number(t))) {
+          if (/\d/.test(ch)) {
+            digits++;
+            out.push({ ch, pos: pos + digits });
+          } else out.push({ ch, pos: pos + digits, sep: true });
+        }
+        pos += digits;
+      }
+      return out;
+    },
+    caret: () => caret,
+    // Put the caret after raw char `pos`; the end (or past it) goes back to plain typing.
+    setCaret(pos) {
+      caret = pos >= raw().length ? null : Math.max(0, pos);
     },
   };
 }

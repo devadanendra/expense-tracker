@@ -109,9 +109,14 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     const v = calc.value();
     if (v !== null || !expr) shown = v ?? 0; // trailing operator or ÷ 0: keep the last good total
     const text = formatNum(shown);
-    $('.amtIn .v').textContent = text;
+    const hasOp = /[-+×÷]/.test(expr);
+    // Digits are tappable spans (data-pos) so a tap puts the caret there; see the pointerup below.
+    const cells = calc.chars();
+    const at = calc.caret();
+    const mark = (cs) => (at === 0 ? '<i class="cr"></i>' : '') + cs.map((c) => `<span class="ch${c.op ? ' op' : ''}" data-pos="${c.pos}">${esc(c.ch)}</span>${!c.sep && c.pos === at ? '<i class="cr"></i>' : ''}`).join('');
+    $('.amtIn .v').innerHTML = !hasOp && cells.length ? mark(cells) : esc(text);
     $('.amtIn .v').style.fontSize = text.length > 13 ? '32px' : text.length > 9 ? '40px' : '';
-    $('.expr').textContent = /[-+×÷]/.test(expr) ? expr : '';
+    $('.expr').innerHTML = hasOp ? mark(cells) : '';
     $('[data-act=save]').disabled = busy || !calc.canSave();
     if (expense) $('[data-act=delete]').disabled = busy;
     for (const b of root.querySelectorAll('[data-cat]')) b.setAttribute('aria-pressed', b.dataset.cat === categoryId);
@@ -264,7 +269,7 @@ export async function openEntrySheet({ expense, onDone } = {}) {
   }
   sheet.addEventListener('pointerdown', (e) => {
     if (drag || busy || !e.isPrimary || e.button > 0 || !e.target.closest('.es-head, .es-amt') || e.target.closest('button')) return;
-    drag = { id: e.pointerId, y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
+    drag = { amt: !!e.target.closest('.es-amt'), id: e.pointerId, x0: e.clientX, y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
     sheet.setPointerCapture(e.pointerId);
     root.classList.add('drag');
   });
@@ -281,8 +286,16 @@ export async function openEntrySheet({ expense, onDone } = {}) {
     const dy = Math.max(0, e.clientY - drag.y0);
     // A fling needs a recent fast move and some distance, so a tap's jitter never closes.
     const fling = drag.v > FLING && e.timeStamp - drag.t < 100 && dy > 16;
+    const tap = drag.amt && e.type === 'pointerup' && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 10;
     drag = null;
     root.classList.remove('drag');
+    // A tap on the amount (the pointer is captured, so no click reaches the digit): put the caret
+    // after the tapped digit, so Backspace removes it. A tap on the empty area goes back to the end.
+    if (tap) {
+      const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-pos]');
+      calc.setCaret(hit ? Number(hit.dataset.pos) : Infinity);
+      return update();
+    }
     if (e.type === 'pointerup' && (dy > sheet.offsetHeight * CLOSE_DRAG || fling)) {
       follow(sheet.offsetHeight);
       setTimeout(close, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200);

@@ -112,6 +112,40 @@ export function openSheet(title, inner) {
     dlg.remove();
     if (opener) document.getElementById(opener)?.focus();
   });
+  // Drag down from the grabber or title row to close: the sheet follows the finger, then closes
+  // past a quarter of its height or on a fling, else springs back (CSS transition).
+  let drag = null;
+  const follow = (dy) => {
+    dlg.style.transform = dy ? `translateY(${dy}px)` : '';
+    dlg.style.setProperty('--fade', dy ? Math.max(0, 1 - dy / dlg.offsetHeight) : '');
+  };
+  dlg.addEventListener('pointerdown', (e) => {
+    if (drag || !e.isPrimary || e.button > 0 || !e.target.closest('.grab, .sh') || e.target.closest('button')) return;
+    drag = { id: e.pointerId, y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
+    dlg.setPointerCapture(e.pointerId);
+    dlg.classList.add('drag');
+  });
+  dlg.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (e.timeStamp > drag.t) drag.v = (e.clientY - drag.y) / (e.timeStamp - drag.t);
+    drag.y = e.clientY;
+    drag.t = e.timeStamp;
+    follow(Math.max(0, e.clientY - drag.y0));
+  });
+  const release = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = Math.max(0, e.clientY - drag.y0);
+    const fling = drag.v > 0.5 && e.timeStamp - drag.t < 100 && dy > 16;
+    drag = null;
+    dlg.classList.remove('drag');
+    if (e.type === 'pointerup' && (dy > dlg.offsetHeight * 0.25 || fling)) {
+      follow(dlg.offsetHeight);
+      setTimeout(() => dlg.close(), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200);
+    } else follow(0);
+  };
+  dlg.addEventListener('pointerup', release);
+  dlg.addEventListener('pointercancel', release);
+
   document.body.append(dlg);
   dlg.showModal();
   return dlg;
